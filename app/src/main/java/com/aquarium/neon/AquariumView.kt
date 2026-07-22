@@ -196,7 +196,7 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         canvas.drawCircle(0f, 0f, scale * 1.6f, fillPaint)
         fillPaint.maskFilter = null
 
-        // 2. Построение формы тела по форме VisualForm
+        // 2. Построение формы тела (исправлены функции quadTo)
         fillPaint.color = fish.config.primaryColor
         when (fish.config.form) {
             VisualForm.TALL_DISC -> {
@@ -205,8 +205,8 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             VisualForm.EEL_SNAKE -> {
                 val path = Path().apply {
                     moveTo(scale * 2.2f, 0f)
-                    quadraticTo(0f, -scale * 0.4f, -scale * 3.0f, sin(fish.swimCycle) * 20f)
-                    quadraticTo(0f, scale * 0.4f, scale * 2.2f, 0f)
+                    quadTo(0f, -scale * 0.4f, -scale * 3.0f, sin(fish.swimCycle) * 20f)
+                    quadTo(0f, scale * 0.4f, scale * 2.2f, 0f)
                 }
                 canvas.drawPath(path, fillPaint)
             }
@@ -228,8 +228,8 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             else -> {
                 val bodyPath = Path().apply {
                     moveTo(scale * 1.4f, 0f)
-                    quadraticTo(0f, -scale * 0.7f, -scale * 1.5f, sin(fish.swimCycle) * 12f)
-                    quadraticTo(0f, scale * 0.7f, scale * 1.4f, 0f)
+                    quadTo(0f, -scale * 0.7f, -scale * 1.5f, sin(fish.swimCycle) * 12f)
+                    quadTo(0f, scale * 0.7f, scale * 1.4f, 0f)
                 }
                 canvas.drawPath(bodyPath, fillPaint)
             }
