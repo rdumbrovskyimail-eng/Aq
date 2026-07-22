@@ -3,7 +3,7 @@ package com.aquarium.neon
 import android.content.Context
 import android.graphics.*
 import android.view.MotionEvent
-import android.view.TextureView
+import android.view.View
 import kotlin.math.*
 import kotlin.random.Random
 
@@ -271,15 +271,11 @@ class FishEntity(
 }
 
 // ─────────────────────────────────────────────────────────────
-// 6. TextureView аквариума (100% стабильность на S23 Ultra)
+// 6. Нативный View аквариума (Абсолютная надежность на Android)
 // ─────────────────────────────────────────────────────────────
-class AquariumView(context: Context) : TextureView(context), TextureView.SurfaceTextureListener, Runnable {
+class AquariumView(context: Context) : View(context) {
 
-    private var renderThread: Thread? = null
-    @Volatile private var isRunning = false
-
-    private val worldLock = Any()
-    @Volatile private var tapPoint: Vector2D? = null
+    private var tapPoint: Vector2D? = null
     private var tapShockwave = 0f
 
     private val fishes    = mutableListOf<FishEntity>()
@@ -291,7 +287,7 @@ class AquariumView(context: Context) : TextureView(context), TextureView.Surface
 
     private var screenW = 0f
     private var screenH = 0f
-    @Volatile private var isWorldInitialized = false
+    private var isWorldInitialized = false
     private var frameTime = 0L
 
     private val fillPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -301,173 +297,126 @@ class AquariumView(context: Context) : TextureView(context), TextureView.Surface
     private val reusePath   = Path()
 
     init {
-        surfaceTextureListener = this
         isFocusable = true
+        isClickable = true
     }
 
-    override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
-        if (width > 0 && height > 0) {
-            screenW = width.toFloat()
-            screenH = height.toFloat()
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (w > 0 && h > 0) {
+            screenW = w.toFloat()
+            screenH = h.toFloat()
             initWorld(screenW, screenH)
             isWorldInitialized = true
-            startSimulation()
         }
     }
-
-    override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {
-        if (width > 0 && height > 0) {
-            screenW = width.toFloat()
-            screenH = height.toFloat()
-            initWorld(screenW, screenH)
-        }
-    }
-
-    override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
-        stopSimulation()
-        return true
-    }
-
-    override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {}
 
     private fun initWorld(w: Float, h: Float) {
-        synchronized(worldLock) {
-            fishes.clear(); caves.clear(); anemones.clear()
-            bubbles.clear(); particles.clear(); corals.clear()
-            tapPoint = null
-            tapShockwave = 0f
+        fishes.clear(); caves.clear(); anemones.clear()
+        bubbles.clear(); particles.clear(); corals.clear()
+        tapPoint = null
+        tapShockwave = 0f
 
-            caves += CoralCave(Vector2D(w * 0.15f, h - 90f),  170f, Color.parseColor("#00E5FF"))
-            caves += CoralCave(Vector2D(w * 0.85f, h - 105f), 195f, Color.parseColor("#FF0077"))
+        caves += CoralCave(Vector2D(w * 0.15f, h - 90f),  170f, Color.parseColor("#00E5FF"))
+        caves += CoralCave(Vector2D(w * 0.85f, h - 105f), 195f, Color.parseColor("#FF0077"))
 
-            for (i in 0..5) {
-                anemones += AnemoneTentacle(
-                    Vector2D(w * (0.18f + i * 0.13f), h - 50f),
-                    tentacleCount = 14 + Random.nextInt(4),
-                    length = 110f + Random.nextFloat() * 40f
-                )
-            }
-
-            repeat(80) {
-                val r = 1.5f + Random.nextFloat() * 4f
-                bubbles += Bubble(
-                    x = Random.nextFloat() * w,
-                    y = Random.nextFloat() * h,
-                    radius = r,
-                    speedY = 1.4f + (5.5f - r) * 0.3f,
-                    wobble = 0.008f + Random.nextFloat() * 0.018f
-                )
-            }
-
-            val coralColors = listOf(
-                Color.parseColor("#FF0077"), Color.parseColor("#FF5500"),
-                Color.parseColor("#00E5FF"), Color.parseColor("#B388FF"),
-                Color.parseColor("#00C853"), Color.parseColor("#FFAB40")
-            )
-            repeat(18) {
-                val cx = w * 0.04f + Random.nextFloat() * w * 0.92f
-                val cy = h - 30f
-                val col = coralColors[Random.nextInt(coralColors.size)]
-                val branches = (0 until 3 + Random.nextInt(5)).map {
-                    val ang = -PI.toFloat() / 2f + (Random.nextFloat() - 0.5f) * 1.4f
-                    val len = 40f + Random.nextFloat() * 80f
-                    Triple(cx + cos(ang) * len, cy + sin(ang) * len, 2f + Random.nextFloat() * 4f)
-                }
-                corals += CoralPlant(cx, cy, col, branches)
-            }
-
-            for (species in FishSpeciesRegistry.ALL_SPECIES) {
-                val count = when (species.behavior) {
-                    BehaviorType.FLOCKING       -> Random.nextInt(3, 6)
-                    BehaviorType.SOLITARY       -> 1
-                    BehaviorType.AGGRESSIVE     -> 1
-                    BehaviorType.PREDATOR       -> 1
-                    BehaviorType.BOTTOM_DWELLER -> Random.nextInt(1, 3)
-                    BehaviorType.HIDER          -> Random.nextInt(1, 3)
-                }
-                repeat(count) {
-                    fishes += FishEntity(
-                        species,
-                        Vector2D(100f + Random.nextFloat() * (w - 200f), 100f + Random.nextFloat() * (h - 200f))
-                    )
-                }
-            }
-
-            bgPaint.shader = LinearGradient(
-                0f, 0f, 0f, h,
-                intArrayOf(
-                    0xFF002B47.toInt(),
-                    0xFF00182E.toInt(),
-                    0xFF000A1A.toInt()
-                ),
-                null, Shader.TileMode.CLAMP
+        for (i in 0..5) {
+            anemones += AnemoneTentacle(
+                Vector2D(w * (0.18f + i * 0.13f), h - 50f),
+                tentacleCount = 14 + Random.nextInt(4),
+                length = 110f + Random.nextFloat() * 40f
             )
         }
-    }
 
-    fun startSimulation() {
-        if (!isRunning && isWorldInitialized) {
-            isRunning = true
-            renderThread = Thread(this, "AquariumRender").apply { start() }
+        repeat(80) {
+            val r = 1.5f + Random.nextFloat() * 4f
+            bubbles += Bubble(
+                x = Random.nextFloat() * w,
+                y = Random.nextFloat() * h,
+                radius = r,
+                speedY = 1.4f + (5.5f - r) * 0.3f,
+                wobble = 0.008f + Random.nextFloat() * 0.018f
+            )
         }
-    }
 
-    fun stopSimulation() {
-        isRunning = false
-        try { renderThread?.join(1500) } catch (e: Exception) { e.printStackTrace() }
-    }
-
-    override fun run() {
-        while (isRunning) {
-            val t0 = System.currentTimeMillis()
-            if (isAvailable && screenW > 0f && screenH > 0f) {
-                var canvas: Canvas? = null
-                try {
-                    canvas = lockCanvas()
-                    if (canvas != null) {
-                        updatePhysics()
-                        drawWorld(canvas)
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                } finally {
-                    if (canvas != null) {
-                        try { unlockCanvasAndPost(canvas) }
-                        catch (e: Exception) { e.printStackTrace() }
-                    }
-                }
+        val coralColors = listOf(
+            Color.parseColor("#FF0077"), Color.parseColor("#FF5500"),
+            Color.parseColor("#00E5FF"), Color.parseColor("#B388FF"),
+            Color.parseColor("#00C853"), Color.parseColor("#FFAB40")
+        )
+        repeat(18) {
+            val cx = w * 0.04f + Random.nextFloat() * w * 0.92f
+            val cy = h - 30f
+            val col = coralColors[Random.nextInt(coralColors.size)]
+            val branches = (0 until 3 + Random.nextInt(5)).map {
+                val ang = -PI.toFloat() / 2f + (Random.nextFloat() - 0.5f) * 1.4f
+                val len = 40f + Random.nextFloat() * 80f
+                Triple(cx + cos(ang) * len, cy + sin(ang) * len, 2f + Random.nextFloat() * 4f)
             }
-            val sleep = (16L - (System.currentTimeMillis() - t0)).coerceAtLeast(4L)
-            try { Thread.sleep(sleep) } catch (_: Exception) {}
+            corals += CoralPlant(cx, cy, col, branches)
         }
+
+        for (species in FishSpeciesRegistry.ALL_SPECIES) {
+            val count = when (species.behavior) {
+                BehaviorType.FLOCKING       -> Random.nextInt(3, 6)
+                BehaviorType.SOLITARY       -> 1
+                BehaviorType.AGGRESSIVE     -> 1
+                BehaviorType.PREDATOR       -> 1
+                BehaviorType.BOTTOM_DWELLER -> Random.nextInt(1, 3)
+                BehaviorType.HIDER          -> Random.nextInt(1, 3)
+            }
+            repeat(count) {
+                fishes += FishEntity(
+                    species,
+                    Vector2D(100f + Random.nextFloat() * (w - 200f), 100f + Random.nextFloat() * (h - 200f))
+                )
+            }
+        }
+
+        bgPaint.shader = LinearGradient(
+            0f, 0f, 0f, h,
+            intArrayOf(
+                0xFF002B47.toInt(),
+                0xFF00182E.toInt(),
+                0xFF000A1A.toInt()
+            ),
+            null, Shader.TileMode.CLAMP
+        )
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        if (!isWorldInitialized || screenW <= 0f || screenH <= 0f) return
+
+        updatePhysics()
+        drawWorld(canvas)
+
+        // Плавно запрашиваем следующий кадр с синхронизацией 120 FPS
+        postInvalidateOnAnimation()
     }
 
     private fun updatePhysics() {
         frameTime++
-        var currentTap: Vector2D?
+        var currentTap = tapPoint
+        if (currentTap != null) {
+            tapShockwave += 22f
+            if (tapShockwave > 560f) { tapPoint = null; tapShockwave = 0f; currentTap = null }
+        }
 
-        synchronized(worldLock) {
-            currentTap = tapPoint
-            if (currentTap != null) {
-                tapShockwave += 22f
-                if (tapShockwave > 560f) { tapPoint = null; tapShockwave = 0f; currentTap = null }
-            }
+        val iter = particles.iterator()
+        while (iter.hasNext()) {
+            val p = iter.next()
+            p.x += p.vx; p.y += p.vy; p.vy += 0.15f; p.life -= 0.035f
+            if (p.life <= 0f) iter.remove()
+        }
 
-            val iter = particles.iterator()
-            while (iter.hasNext()) {
-                val p = iter.next()
-                p.x += p.vx; p.y += p.vy; p.vy += 0.15f; p.life -= 0.035f
-                if (p.life <= 0f) iter.remove()
-            }
+        for (a in anemones) a.update(currentTap)
+        for (f in fishes) f.update(screenW, screenH, fishes, caves, currentTap)
 
-            for (a in anemones) a.update(currentTap)
-            for (f in fishes) f.update(screenW, screenH, fishes, caves, currentTap)
-
-            for (b in bubbles) {
-                b.y -= b.speedY
-                b.x += sin(b.y * b.wobble) * 1.2f
-                if (b.y < -10f) { b.y = screenH + 10f; b.x = Random.nextFloat() * screenW }
-            }
+        for (b in bubbles) {
+            b.y -= b.speedY
+            b.x += sin(b.y * b.wobble) * 1.2f
+            if (b.y < -10f) { b.y = screenH + 10f; b.x = Random.nextFloat() * screenW }
         }
     }
 
@@ -477,17 +426,15 @@ class AquariumView(context: Context) : TextureView(context), TextureView.Surface
         renderLightRays(canvas)
         renderSandFloor(canvas)
 
-        synchronized(worldLock) {
-            renderCorals(canvas)
-            renderCavesAndAnemones(canvas)
-            renderBubbles(canvas)
+        renderCorals(canvas)
+        renderCavesAndAnemones(canvas)
+        renderBubbles(canvas)
 
-            val sortedFishes = fishes.sortedBy { it.depth }
-            for (f in sortedFishes) renderFishEntity(canvas, f)
+        val sortedFishes = fishes.sortedBy { it.depth }
+        for (f in sortedFishes) renderFishEntity(canvas, f)
 
-            renderParticles(canvas)
-            renderTapShockwave(canvas)
-        }
+        renderParticles(canvas)
+        renderTapShockwave(canvas)
     }
 
     private fun renderCaustics(canvas: Canvas) {
@@ -632,18 +579,17 @@ class AquariumView(context: Context) : TextureView(context), TextureView.Surface
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.action) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
-                synchronized(worldLock) {
-                    tapPoint = Vector2D(event.x, event.y)
-                    tapShockwave = 8f
-                    spawnImpactParticlesLocked(event.x, event.y)
-                }
+                tapPoint = Vector2D(event.x, event.y)
+                tapShockwave = 8f
+                spawnImpactParticles(event.x, event.y)
+                invalidate()
                 performClick()
             }
         }
         return true
     }
 
-    private fun spawnImpactParticlesLocked(x: Float, y: Float) {
+    private fun spawnImpactParticles(x: Float, y: Float) {
         val colors = listOf(Color.parseColor("#00F0FF"), Color.parseColor("#FF0077"), Color.WHITE)
         repeat(10) {
             val ang = Random.nextFloat() * PI.toFloat() * 2f
