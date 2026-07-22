@@ -4,7 +4,7 @@ import android.graphics.Color
 import kotlin.math.*
 import kotlin.random.Random
 
-// Векторный математический класс
+// Полная векторная математика 2D
 data class Vector2D(var x: Float = 0f, var y: Float = 0f) {
     fun add(v: Vector2D): Vector2D { x += v.x; y += v.y; return this }
     fun sub(v: Vector2D): Vector2D { x -= v.x; y -= v.y; return this }
@@ -56,9 +56,9 @@ object FishSpeciesRegistry {
         SpeciesConfig(11, "Golden Dragon Betta", Color.parseColor("#FFD700"), Color.parseColor("#FFFF80"), Color.RED, VisualForm.TALL_DISC, 3.0f, BehaviorType.AGGRESSIVE, 2.2f),
         SpeciesConfig(12, "Spiky Volitan Lionfish", Color.parseColor("#FF3D00"), Color.parseColor("#FFAB91"), Color.WHITE, VisualForm.LIONFISH_SPIKY, 2.2f, BehaviorType.AGGRESSIVE, 3.2f),
         SpeciesConfig(13, "Mandarin Psychedelic", Color.parseColor("#AA00FF"), Color.parseColor("#EA80FC"), Color.GREEN, VisualForm.SLENDER_NEON, 2.5f, BehaviorType.HIDER, 1.2f),
-        SpeciesConfig(14, "Electric Ribbon Eel", Color.parseColor("#0288D1"), Color.parseColor("#80D8FF"), Color.YELLOW, VisualForm.EEL_SNAKE, 4.0f, BehaviorType.HIDER, 3.5f, 16),
+        SpeciesConfig(14, "Electric Ribbon Eel", Color.parseColor("#0288D1"), Color.parseColor("#80D8FF"), Color.YELLOW, VisualForm.EEL_SNAKE, 4.0f, BehaviorType.HIDER, 3.5f, 14),
         SpeciesConfig(15, "Pink Biolum Jelly", Color.parseColor("#E91E63"), Color.parseColor("#FF80AB"), Color.CYAN, VisualForm.JELLY_GLOW, 1.3f, BehaviorType.SOLITARY, 2.3f),
-        SpeciesConfig(16, "Abyssal Viper Dragon", Color.parseColor("#311B92"), Color.parseColor("#B388FF"), Color.CYAN, VisualForm.EEL_SNAKE, 5.8f, BehaviorType.PREDATOR, 2.8f, 14),
+        SpeciesConfig(16, "Abyssal Viper Dragon", Color.parseColor("#311B92"), Color.parseColor("#B388FF"), Color.CYAN, VisualForm.EEL_SNAKE, 5.8f, BehaviorType.PREDATOR, 2.8f, 12),
         SpeciesConfig(17, "Crown Pygmy Seahorse", Color.parseColor("#FF4081"), Color.parseColor("#FF80AB"), Color.WHITE, VisualForm.SEAHORSE, 1.4f, BehaviorType.HIDER, 1.2f),
         SpeciesConfig(18, "Ruby Starfish Crawler", Color.parseColor("#FF1744"), Color.parseColor("#FF5252"), Color.YELLOW, VisualForm.STAR_CRAWLER, 0.4f, BehaviorType.BOTTOM_DWELLER, 1.9f),
         SpeciesConfig(19, "Linckia Cyan Star", Color.parseColor("#2979FF"), Color.parseColor("#82B1FF"), Color.WHITE, VisualForm.STAR_CRAWLER, 0.35f, BehaviorType.BOTTOM_DWELLER, 2.0f),
@@ -84,16 +84,15 @@ object FishSpeciesRegistry {
 // Укрытие на дне (пещеры)
 data class CoralCave(val pos: Vector2D, val radius: Float, val neonColor: Int)
 
-// Интерактивный анемон
-class AnemoneTentacle(val basePos: Vector2D, val tentacleCount: Int = 14, val length: Float = 120f) {
+class AnemoneTentacle(val basePos: Vector2D, val tentacleCount: Int = 16, val length: Float = 130f) {
     val angles = FloatArray(tentacleCount) { (it.toFloat() / tentacleCount) * PI.toFloat() - PI.toFloat() / 2 }
     val phases = FloatArray(tentacleCount) { Random.nextFloat() * 20f }
 
     fun update(tapPoint: Vector2D?) {
         for (i in 0 until tentacleCount) {
             phases[i] += 0.05f
-            if (tapPoint != null && tapPoint.dist(basePos) < 300f) {
-                phases[i] += 0.25f
+            if (tapPoint != null && tapPoint.dist(basePos) < 320f) {
+                phases[i] += 0.3f
             }
         }
     }
@@ -117,16 +116,14 @@ class FishEntity(
         // Реакция на Тап по экрану
         if (tapPoint != null) {
             val distToTap = position.dist(tapPoint)
-            if (distToTap < 500f) {
+            if (distToTap < 550f) {
                 if (config.behavior == BehaviorType.AGGRESSIVE || config.behavior == BehaviorType.PREDATOR) {
-                    // Стремительная АТАКА в точку касания!
-                    val attackForce = Vector2D(tapPoint.x - position.x, tapPoint.y - position.y).normalize().mult(config.maxSpeed * 2.8f)
+                    val attackForce = Vector2D(tapPoint.x - position.x, tapPoint.y - position.y).normalize().mult(config.maxSpeed * 3.0f)
                     acceleration.add(attackForce)
                     isAttacking = true
-                    attackCooldown = 45
+                    attackCooldown = 50
                 } else {
-                    // Убегание и прятки!
-                    val fleeForce = Vector2D(position.x - tapPoint.x, position.y - tapPoint.y).normalize().mult(config.maxSpeed * 3.5f / (distToTap / 100f).coerceAtLeast(0.3f))
+                    val fleeForce = Vector2D(position.x - tapPoint.x, position.y - tapPoint.y).normalize().mult(config.maxSpeed * 3.8f / (distToTap / 100f).coerceAtLeast(0.3f))
                     acceleration.add(fleeForce)
                 }
             }
@@ -134,37 +131,32 @@ class FishEntity(
 
         if (attackCooldown > 0) attackCooldown-- else isAttacking = false
 
-        // Физика поведения Boids (Стая)
         if (config.behavior == BehaviorType.FLOCKING && !isAttacking) {
             applyBoidsFlocking(fishes)
         }
 
-        // Поведение пряток в ближайшую пещеру
         if (config.behavior == BehaviorType.HIDER) {
             caves.minByOrNull { it.pos.dist(position) }?.let { cave ->
-                if (cave.pos.dist(position) < 300f) {
-                    val hideVec = Vector2D(cave.pos.x - position.x, cave.pos.y - position.y).normalize().mult(config.maxSpeed * 0.6f)
+                if (cave.pos.dist(position) < 350f) {
+                    val hideVec = Vector2D(cave.pos.x - position.x, cave.pos.y - position.y).normalize().mult(config.maxSpeed * 0.7f)
                     acceleration.add(hideVec)
                 }
             }
         }
 
-        // Авто-wander (Хаотичное блуждание)
         acceleration.add(Vector2D((Random.nextFloat() - 0.5f) * 0.4f, (Random.nextFloat() - 0.5f) * 0.4f))
 
-        // Физическое движение
         velocity.add(acceleration)
-        val currentMaxSpeed = if (isAttacking) config.maxSpeed * 2.8f else config.maxSpeed
+        val currentMaxSpeed = if (isAttacking) config.maxSpeed * 3.0f else config.maxSpeed
         velocity.limit(currentMaxSpeed)
         position.add(velocity)
         acceleration.mult(0f)
 
-        // Отталкивание от стенок аквариума
         val margin = 80f
-        if (position.x < margin) velocity.x += 0.8f
-        if (position.x > w - margin) velocity.x -= 0.8f
-        if (position.y < margin) velocity.y += 0.8f
-        if (position.y > h - margin && config.behavior != BehaviorType.BOTTOM_DWELLER) velocity.y -= 0.8f
+        if (position.x < margin) velocity.x += 0.9f
+        if (position.x > w - margin) velocity.x -= 0.9f
+        if (position.y < margin) velocity.y += 0.9f
+        if (position.y > h - margin && config.behavior != BehaviorType.BOTTOM_DWELLER) velocity.y -= 0.9f
 
         // Донные обитатели держатся пола
         if (config.behavior == BehaviorType.BOTTOM_DWELLER) {
@@ -191,7 +183,7 @@ class FishEntity(
         for (other in fishes) {
             if (other.config.id == config.id && other != this) {
                 val d = position.dist(other.position)
-                if (d in 0.1f..160f) {
+                if (d in 0.1f..170f) {
                     sep.add(Vector2D(position.x - other.position.x, position.y - other.position.y).normalize().div(d))
                     align.add(other.velocity)
                     center.add(other.position)
