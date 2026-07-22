@@ -15,14 +15,15 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        setupImmersiveFullscreen()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable -> throwable.printStackTrace() }
+        setupImmersiveMode()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         aquariumView = AquariumView(this)
         setContentView(aquariumView)
     }
 
-    private fun setupImmersiveFullscreen() {
+    private fun setupImmersiveMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.setDecorFitsSystemWindows(false)
             window.insetsController?.let { controller ->
