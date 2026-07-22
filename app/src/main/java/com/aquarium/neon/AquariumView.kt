@@ -58,6 +58,7 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
     init {
         holder.addCallback(this)
+        setZOrderOnTop(true)
         holder.setFormat(PixelFormat.TRANSLUCENT)
         isFocusable = true
     }
@@ -143,11 +144,11 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         bgPaint.shader = LinearGradient(
             0f, 0f, 0f, h,
             intArrayOf(
-                Color.parseColor("#010914"), Color.parseColor("#001326"),
-                Color.parseColor("#000B1E"), Color.parseColor("#00050B")
+                0xFF002B47.toInt(),
+                0xFF00182E.toInt(),
+                0xFF000A1A.toInt()
             ),
-            floatArrayOf(0f, 0.45f, 0.75f, 1f),
-            Shader.TileMode.CLAMP
+            null, Shader.TileMode.CLAMP
         )
     }
 
