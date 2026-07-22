@@ -19,6 +19,8 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            // Автоматическая цифровой подпись ключом для успешной установки на смартфон:
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
