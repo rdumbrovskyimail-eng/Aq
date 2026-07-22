@@ -2,7 +2,6 @@ package com.aquarium.neon
 
 import android.content.Context
 import android.graphics.*
-import android.os.Build
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -47,7 +46,7 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
     private var screenW = 0f
     private var screenH = 0f
-    private var isWorldInitialized = false
+    @Volatile private var isWorldInitialized = false  // FIX 1: добавлен @Volatile
     private var frameTime = 0L
 
     private val fillPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -58,8 +57,8 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
     init {
         holder.addCallback(this)
-        setZOrderOnTop(true)
-        holder.setFormat(PixelFormat.TRANSLUCENT)
+        // FIX 2: убраны setZOrderOnTop(true) и holder.setFormat(PixelFormat.TRANSLUCENT)
+        //         они делали поверхность прозрачной → серый экран
         isFocusable = true
     }
 
@@ -170,11 +169,9 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             if (holder.surface.isValid && screenW > 0f && screenH > 0f) {
                 var canvas: Canvas? = null
                 try {
-                    canvas = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        holder.lockHardwareCanvas()
-                    } else {
-                        holder.lockCanvas()
-                    }
+                    // FIX 3: lockHardwareCanvas() не работает с TRANSLUCENT и падает на многих устройствах.
+                    //         Используем обычный lockCanvas() — стабильно на всех API.
+                    canvas = holder.lockCanvas()
                     if (canvas != null) {
                         updatePhysics()
                         drawWorld(canvas)
@@ -500,7 +497,6 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             else -> {}
         }
 
-        // Глаз
         if (fish.config.form != VisualForm.STAR_CRAWLER) {
             fillPaint.color = if (fish.isAttacking) Color.RED else Color.WHITE
             canvas.drawCircle(scale * 0.72f, -scale * 0.28f, scale * 0.23f, fillPaint)
