@@ -206,8 +206,13 @@ class FishEntity(
         }
 
         acceleration.add(Vector2D((Random.nextFloat() - 0.5f) * 0.5f, (Random.nextFloat() - 0.5f) * 0.5f))
+        val waterFriction = 0.98f
+        val currentMaxSpeed = if (isAttacking) config.maxSpeed * 3.0f else config.maxSpeed
         velocity.add(acceleration)
-        velocity.limit(if (isAttacking) config.maxSpeed * 3.0f else config.maxSpeed)
+        velocity.mult(waterFriction)
+        if (velocity.mag() > currentMaxSpeed) {
+            velocity.normalize().mult(currentMaxSpeed)
+        }
         position.add(velocity)
         acceleration.mult(0f)
 
@@ -294,6 +299,10 @@ class AquariumView(context: Context) : View(context) {
     private val fillPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val glowPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { 
+        style = Paint.Style.FILL 
+        color = Color.argb(40, 0, 0, 0)
+    }
     private val bgPaint     = Paint()
     private val reusePath   = Path()
 
@@ -450,12 +459,15 @@ class AquariumView(context: Context) : View(context) {
     }
 
     private fun renderLightRays(canvas: Canvas) {
-        val t = frameTime * 0.007f
-        strokePaint.strokeWidth = 48f
-        strokePaint.color = Color.argb(9, 0, 229, 255)
+        val time = System.currentTimeMillis() * 0.0005f
+        strokePaint.strokeWidth = 60f
+        
         for (i in 0..8) {
-            val x = (screenW / 8f) * i + sin(t + i * 0.7f) * 50f
-            canvas.drawLine(x, 0f, x + 180f, screenH, strokePaint)
+            val wave = sin(time + i) * 30f + cos(time * 0.7f - i) * 20f + sin(time * 1.3f) * 10f
+            val x = (screenW / 8f) * i + wave
+            
+            strokePaint.color = Color.argb((15 + sin(time + i * 2) * 5).toInt(), 0, 220, 255)
+            canvas.drawLine(x, -50f, x + 150f + wave * 2, screenH + 50f, strokePaint)
         }
     }
 
@@ -529,8 +541,16 @@ class AquariumView(context: Context) : View(context) {
         val head  = fish.spine[0]
         val angle = atan2(fish.velocity.y, fish.velocity.x) * (180f / PI.toFloat())
         val scale = fish.config.sizeScale * 14f
-        val depthAlpha = (130 + fish.depth * 125).toInt()
         val depthScale = 0.7f + fish.depth * 0.3f
+
+        canvas.save()
+        val shadowOffsetX = 30f * depthScale
+        val shadowOffsetY = 60f * depthScale
+        canvas.translate(head.x + shadowOffsetX, head.y + shadowOffsetY)
+        canvas.rotate(angle)
+        canvas.scale(depthScale * 0.9f, depthScale * 0.9f)
+        canvas.drawOval(-scale * 1.5f, -scale * 0.6f, scale * 1.5f, scale * 0.6f, shadowPaint)
+        canvas.restore()
 
         canvas.save()
         canvas.translate(head.x, head.y)
@@ -541,7 +561,8 @@ class AquariumView(context: Context) : View(context) {
         glowPaint.color = Color.argb(if (fish.isAttacking) 90 else 40, Color.red(gc), Color.green(gc), Color.blue(gc))
         canvas.drawCircle(0f, 0f, scale * 2.2f, glowPaint)
 
-        fillPaint.color = (fish.config.primaryColor and 0x00FFFFFF) or (depthAlpha shl 24)
+        val fogColor = Color.parseColor("#001326")
+        fillPaint.color = blendColors(fogColor, fish.config.primaryColor, fish.depth)
         strokePaint.color = fish.config.accentColor; strokePaint.strokeWidth = 3.5f
 
         when (fish.config.form) {
@@ -605,4 +626,12 @@ class AquariumView(context: Context) : View(context) {
     }
 
     override fun performClick(): Boolean { super.performClick(); return true }
+
+    private fun blendColors(color1: Int, color2: Int, ratio: Float): Int {
+        val inverseRatio = 1f - ratio
+        val r = (Color.red(color1) * inverseRatio + Color.red(color2) * ratio).toInt()
+        val g = (Color.green(color1) * inverseRatio + Color.green(color2) * ratio).toInt()
+        val b = (Color.blue(color1) * inverseRatio + Color.blue(color2) * ratio).toInt()
+        return Color.rgb(r, g, b)
+    }
 }
