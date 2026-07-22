@@ -122,22 +122,22 @@ class FishEntity(
     )
 ) {
     var acceleration = Vector2D()
-    val spine = Array(config.segmentCount) { position.copy() }
+    val spine = Array(config.segmentCount) { Vector2D() }
     var swimCycle = Random.nextFloat() * 100f
     var isAttacking = false
     var attackCooldown = 0
     val depth = Random.nextFloat()
 
     init {
-        val invDir = if (velocity.mag() > 0.01f)
-            Vector2D(-velocity.x, -velocity.y).normalize()
-        else
-            Vector2D(-1f, 0f)
+        // Правильное создание хвоста за головой при появлении
         val segLen = 15f * config.sizeScale
-        for (i in 1 until spine.size) {
+        val angle = if (velocity.mag() > 0.01f) atan2(velocity.y, velocity.x) else 0f
+        val cosA = cos(angle)
+        val sinA = sin(angle)
+        for (i in 0 until spine.size) {
             spine[i] = Vector2D(
-                position.x + invDir.x * segLen * i,
-                position.y + invDir.y * segLen * i
+                position.x - cosA * segLen * i,
+                position.y - sinA * segLen * i
             )
         }
     }
@@ -213,17 +213,17 @@ class FishEntity(
     }
 
     private fun updateSpineIK() {
-        spine[0].setFrom(position)
+        spine[0].set(position.x, position.y)
         val segLen = 15f * config.sizeScale
         for (i in 1 until spine.size) {
             val prev = spine[i - 1]
             val curr = spine[i]
             val dx = curr.x - prev.x
             val dy = curr.y - prev.y
-            val d = sqrt(dx * dx + dy * dy)
-            if (d > 0.001f) {
-                curr.x = prev.x + (dx / d) * segLen
-                curr.y = prev.y + (dy / d) * segLen
+            val dist = sqrt(dx * dx + dy * dy)
+            if (dist > 0.001f) {
+                curr.x = prev.x + (dx / dist) * segLen
+                curr.y = prev.y + (dy / dist) * segLen
             } else {
                 curr.x = prev.x - segLen
                 curr.y = prev.y
