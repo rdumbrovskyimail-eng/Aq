@@ -90,7 +90,7 @@ object FishSpeciesRegistry {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  Пещеры и аквариумный декор
+//  Декор и аквариумная инфраструктура
 // ─────────────────────────────────────────────────────────────
 data class CoralCave(val pos: Vector2D, val radius: Float, val neonColor: Int)
 
@@ -111,7 +111,7 @@ class AnemoneTentacle(
 }
 
 // ─────────────────────────────────────────────────────────────
-//  Сущность рыбы с инверсной кинематикой (Spine IK)
+//  Сущность рыбы
 // ─────────────────────────────────────────────────────────────
 class FishEntity(
     val config: SpeciesConfig,
@@ -126,7 +126,7 @@ class FishEntity(
     var swimCycle = Random.nextFloat() * 100f
     var isAttacking = false
     var attackCooldown = 0
-    val depth = Random.nextFloat() // Параллакс глубина (0..1)
+    val depth = Random.nextFloat()
 
     init {
         val invDir = if (velocity.mag() > 0.01f)
@@ -150,7 +150,6 @@ class FishEntity(
     ) {
         swimCycle += config.finFrequency
 
-        // Реакция на нажатие по экрану
         if (tapPoint != null) {
             val distToTap = position.dist(tapPoint)
             if (distToTap < 550f) {
@@ -171,12 +170,10 @@ class FishEntity(
 
         if (attackCooldown > 0) attackCooldown-- else isAttacking = false
 
-        // Boids алгоритм (стаивание)
         if (config.behavior == BehaviorType.FLOCKING && !isAttacking) {
             applyBoidsFlocking(fishes)
         }
 
-        // Логика спрятаться в пещере
         if (config.behavior == BehaviorType.HIDER) {
             caves.minByOrNull { it.pos.dist(position) }?.let { cave ->
                 if (cave.pos.dist(position) < 350f) {
@@ -188,7 +185,6 @@ class FishEntity(
             }
         }
 
-        // Броуновское плавание
         acceleration.add(
             Vector2D(
                 (Random.nextFloat() - 0.5f) * 0.5f,
@@ -201,7 +197,6 @@ class FishEntity(
         position.add(velocity)
         acceleration.mult(0f)
 
-        // Мягкие границы экрана
         val margin = 80f
         if (position.x < margin)     velocity.x += 1.2f
         if (position.x > w - margin) velocity.x -= 1.2f
@@ -209,7 +204,6 @@ class FishEntity(
         if (position.y > h - margin && config.behavior != BehaviorType.BOTTOM_DWELLER)
             velocity.y -= 1.2f
 
-        // Донные обитатели
         if (config.behavior == BehaviorType.BOTTOM_DWELLER) {
             position.y = position.y * 0.85f + (h - 80f) * 0.15f
             velocity.y *= 0.6f
