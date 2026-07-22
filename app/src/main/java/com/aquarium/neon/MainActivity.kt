@@ -17,8 +17,8 @@ class MainActivity : AppCompatActivity() {
         Thread.setDefaultUncaughtExceptionHandler { _, throwable -> throwable.printStackTrace() }
         setupImmersiveMode()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        
-        // Гарантированный черный цвет окна Activity вместо серого цвета темы:
+
+        // Подложка черного цвета для исключения серого системного экрана:
         window.setBackgroundDrawableResource(android.R.color.black)
 
         aquariumView = AquariumView(this)
