@@ -359,7 +359,6 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         val depthScale = 0.7f + fish.depth * 0.3f
 
         if (fish.config.form == VisualForm.EEL_SNAKE) {
-            // Угорь отрисовывается непосредственно по мировой цепи позвонков
             var currentWidth = scale * 1.2f
             strokePaint.color = (fish.config.primaryColor and 0x00FFFFFF) or (depthAlpha shl 24)
             for (i in 1 until fish.spine.size) {
@@ -378,7 +377,6 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         canvas.rotate(angle)
         canvas.scale(depthScale, depthScale)
 
-        // Двухслойное неоновое свечение
         val gc = fish.config.neonGlowColor
         glowPaint.color = Color.argb(if (fish.isAttacking) 90 else 40, Color.red(gc), Color.green(gc), Color.blue(gc))
         canvas.drawCircle(0f, 0f, scale * 2.4f, glowPaint)
