@@ -18,9 +18,6 @@ class MainActivity : AppCompatActivity() {
         setupImmersiveMode()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // Подложка черного цвета для исключения серого системного экрана:
-        window.setBackgroundDrawableResource(android.R.color.black)
-
         aquariumView = AquariumView(this)
         setContentView(aquariumView)
     }
