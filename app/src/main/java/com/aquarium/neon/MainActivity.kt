@@ -17,9 +17,10 @@ class MainActivity : AppCompatActivity() {
         Thread.setDefaultUncaughtExceptionHandler { _, throwable -> throwable.printStackTrace() }
         setupImmersiveMode()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        // FIX 4: setBackgroundDrawable(null) оставлял прозрачный фон Activity → серый системный фон.
-        //         Устанавливаем чёрный цвет — он виден через SurfaceView если рендер ещё не начался.
+        
+        // Гарантированный черный цвет окна Activity вместо серого цвета темы:
         window.setBackgroundDrawableResource(android.R.color.black)
+
         aquariumView = AquariumView(this)
         setContentView(aquariumView)
     }
