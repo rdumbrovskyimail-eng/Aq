@@ -6,6 +6,7 @@ import android.view.MotionEvent
 import android.view.View
 import kotlin.math.*
 import kotlin.random.Random
+import java.util.concurrent.CopyOnWriteArrayList
 
 // ─────────────────────────────────────────────────────────────
 // 1. Векторная математика 2D
@@ -278,9 +279,9 @@ class AquariumView(context: Context) : View(context) {
     private var tapPoint: Vector2D? = null
     private var tapShockwave = 0f
 
-    private val fishes    = mutableListOf<FishEntity>()
-    private val caves     = mutableListOf<CoralCave>()
-    private val anemones  = mutableListOf<AnemoneTentacle>()
+    private val fishes    = CopyOnWriteArrayList<FishEntity>()
+    private val caves     = CopyOnWriteArrayList<CoralCave>()
+    private val anemones  = CopyOnWriteArrayList<AnemoneTentacle>()
     private val bubbles   = mutableListOf<Bubble>()
     private val particles = mutableListOf<ImpactParticle>()
     private val corals    = mutableListOf<CoralPlant>()
