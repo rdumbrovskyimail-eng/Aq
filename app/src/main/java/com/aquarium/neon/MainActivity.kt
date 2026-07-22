@@ -23,7 +23,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var aquariumView: AquariumView
     private val logFileName = "crash_log.txt"
 
-    // Ланчер для вызова системного окна выбора папки и создания файла
     private val createDocumentLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -37,16 +36,13 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // 1. Перехватчик: тихо пишет ошибку в защищенный кэш приложения
         setupCrashHandler()
-
         setupImmersiveMode()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         aquariumView = AquariumView(this)
         setContentView(aquariumView)
 
-        // 2. Запускаем таймер на 10 секунд (10000 миллисекунд)
         Handler(Looper.getMainLooper()).postDelayed({
             promptUserForLogDirectory()
         }, 10000)
@@ -55,7 +51,6 @@ class MainActivity : AppCompatActivity() {
     private fun setupCrashHandler() {
         Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
             try {
-                // Пишем во временную папку (доступна всегда без разрешений)
                 val cacheLogFile = File(cacheDir, logFileName)
                 val pw = PrintWriter(FileOutputStream(cacheLogFile, true))
                 pw.println("--- CRASH at ${java.util.Date()} ---")
@@ -64,12 +59,10 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-            // Не вызываем дефолтный обработчик, чтобы Activity не закрылась (остался серый экран)
         }
     }
 
     private fun promptUserForLogDirectory() {
-        // Открываем нативный файловый менеджер смартфона
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "text/plain"
@@ -82,20 +75,17 @@ class MainActivity : AppCompatActivity() {
         try {
             val cacheLogFile = File(cacheDir, logFileName)
             
-            // Если краш был, читаем его; если нет — пишем, что всё ок
             val logContent = if (cacheLogFile.exists()) {
                 cacheLogFile.readText()
             } else {
                 "Крашей не зафиксировано. Поток отрисовки работает стабильно!\n"
             }
 
-            // Записываем данные в выбранную тобой папку
             contentResolver.openOutputStream(uri)?.use { outputStream ->
                 outputStream.write(logContent.toByteArray())
             }
             Toast.makeText(this, "Лог сохранен!", Toast.LENGTH_LONG).show()
             
-            // Очищаем кэш после успешного сохранения
             if (cacheLogFile.exists()) cacheLogFile.delete()
             
         } catch (e: Exception) {
