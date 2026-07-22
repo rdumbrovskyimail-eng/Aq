@@ -14,11 +14,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        Thread.setDefaultUncaughtExceptionHandler { thread, throwable -> throwable.printStackTrace() }
+        Thread.setDefaultUncaughtExceptionHandler { _, throwable -> throwable.printStackTrace() }
         setupImmersiveMode()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
         aquariumView = AquariumView(this)
         setContentView(aquariumView)
     }
@@ -26,9 +24,9 @@ class MainActivity : AppCompatActivity() {
     private fun setupImmersiveMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.setDecorFitsSystemWindows(false)
-            window.insetsController?.let { controller ->
-                controller.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
-                controller.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            window.insetsController?.let { ctrl ->
+                ctrl.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+                ctrl.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
         } else {
             @Suppress("DEPRECATION")
