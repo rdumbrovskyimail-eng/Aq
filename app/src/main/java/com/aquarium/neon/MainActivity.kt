@@ -17,6 +17,7 @@ class MainActivity : AppCompatActivity() {
         Thread.setDefaultUncaughtExceptionHandler { _, throwable -> throwable.printStackTrace() }
         setupImmersiveMode()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.setBackgroundDrawable(null)
         aquariumView = AquariumView(this)
         setContentView(aquariumView)
     }
