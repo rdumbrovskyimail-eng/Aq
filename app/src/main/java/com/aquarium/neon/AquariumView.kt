@@ -3,8 +3,7 @@ package com.aquarium.neon
 import android.content.Context
 import android.graphics.*
 import android.view.MotionEvent
-import android.view.SurfaceHolder
-import android.view.SurfaceView
+import android.view.TextureView
 import kotlin.math.*
 import kotlin.random.Random
 
@@ -34,7 +33,7 @@ enum class VisualForm {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 3. Конфигурации и Реестр 35 Неоновых Видов
+// 3. Конфигурация видов рыб
 // ─────────────────────────────────────────────────────────────
 data class SpeciesConfig(
     val id: Int,
@@ -91,7 +90,7 @@ object FishSpeciesRegistry {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 4. Компоненты окружения (Пещеры, Анемоны, Пузыри)
+// 4. Компоненты аквариума
 // ─────────────────────────────────────────────────────────────
 data class CoralCave(val pos: Vector2D, val radius: Float, val neonColor: Int)
 
@@ -132,7 +131,7 @@ data class CoralPlant(
 )
 
 // ─────────────────────────────────────────────────────────────
-// 5. Класс сущности рыбы (FishEntity)
+// 5. Рыба (FishEntity)
 // ─────────────────────────────────────────────────────────────
 class FishEntity(
     val config: SpeciesConfig,
@@ -272,9 +271,9 @@ class FishEntity(
 }
 
 // ─────────────────────────────────────────────────────────────
-// 6. Главный SurfaceView и Рендерер
+// 6. TextureView аквариума (100% стабильность на S23 Ultra)
 // ─────────────────────────────────────────────────────────────
-class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callback, Runnable {
+class AquariumView(context: Context) : TextureView(context), TextureView.SurfaceTextureListener, Runnable {
 
     private var renderThread: Thread? = null
     @Volatile private var isRunning = false
@@ -302,25 +301,34 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     private val reusePath   = Path()
 
     init {
-        holder.addCallback(this)
+        surfaceTextureListener = this
         isFocusable = true
     }
 
-    override fun surfaceCreated(holder: SurfaceHolder) {}
-
-    override fun surfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {
-        if (w > 0 && h > 0 && (!isWorldInitialized || screenW != w.toFloat() || screenH != h.toFloat())) {
-            screenW = w.toFloat()
-            screenH = h.toFloat()
+    override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
+        if (width > 0 && height > 0) {
+            screenW = width.toFloat()
+            screenH = height.toFloat()
             initWorld(screenW, screenH)
             isWorldInitialized = true
             startSimulation()
         }
     }
 
-    override fun surfaceDestroyed(holder: SurfaceHolder) {
-        stopSimulation()
+    override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {
+        if (width > 0 && height > 0) {
+            screenW = width.toFloat()
+            screenH = height.toFloat()
+            initWorld(screenW, screenH)
+        }
     }
+
+    override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
+        stopSimulation()
+        return true
+    }
+
+    override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {}
 
     private fun initWorld(w: Float, h: Float) {
         synchronized(worldLock) {
@@ -412,10 +420,10 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     override fun run() {
         while (isRunning) {
             val t0 = System.currentTimeMillis()
-            if (holder.surface.isValid && screenW > 0f && screenH > 0f) {
+            if (isAvailable && screenW > 0f && screenH > 0f) {
                 var canvas: Canvas? = null
                 try {
-                    canvas = holder.lockCanvas()
+                    canvas = lockCanvas()
                     if (canvas != null) {
                         updatePhysics()
                         drawWorld(canvas)
@@ -424,7 +432,7 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                     e.printStackTrace()
                 } finally {
                     if (canvas != null) {
-                        try { holder.unlockCanvasAndPost(canvas) }
+                        try { unlockCanvasAndPost(canvas) }
                         catch (e: Exception) { e.printStackTrace() }
                     }
                 }
