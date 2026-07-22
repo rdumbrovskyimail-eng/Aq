@@ -85,7 +85,7 @@ object FishSpeciesRegistry {
 data class CoralCave(val pos: Vector2D, val radius: Float, val neonColor: Int)
 
 // Интерактивный анемон
-class AnemoneTentacle(val basePos: Vector2D, val tentacleCount: Int = 16, val length: Float = 130f) {
+class AnemoneTentacle(val basePos: Vector2D, val tentacleCount: Int = 14, val length: Float = 120f) {
     val angles = FloatArray(tentacleCount) { (it.toFloat() / tentacleCount) * PI.toFloat() - PI.toFloat() / 2 }
     val phases = FloatArray(tentacleCount) { Random.nextFloat() * 20f }
 
@@ -93,7 +93,7 @@ class AnemoneTentacle(val basePos: Vector2D, val tentacleCount: Int = 16, val le
         for (i in 0 until tentacleCount) {
             phases[i] += 0.05f
             if (tapPoint != null && tapPoint.dist(basePos) < 300f) {
-                phases[i] += 0.3f
+                phases[i] += 0.25f
             }
         }
     }
@@ -117,16 +117,16 @@ class FishEntity(
         // Реакция на Тап по экрану
         if (tapPoint != null) {
             val distToTap = position.dist(tapPoint)
-            if (distToTap < 550f) {
+            if (distToTap < 500f) {
                 if (config.behavior == BehaviorType.AGGRESSIVE || config.behavior == BehaviorType.PREDATOR) {
                     // Стремительная АТАКА в точку касания!
-                    val attackForce = Vector2D(tapPoint.x - position.x, tapPoint.y - position.y).normalize().mult(config.maxSpeed * 3.0f)
+                    val attackForce = Vector2D(tapPoint.x - position.x, tapPoint.y - position.y).normalize().mult(config.maxSpeed * 2.8f)
                     acceleration.add(attackForce)
                     isAttacking = true
-                    attackCooldown = 50
+                    attackCooldown = 45
                 } else {
                     // Убегание и прятки!
-                    val fleeForce = Vector2D(position.x - tapPoint.x, position.y - tapPoint.y).normalize().mult(config.maxSpeed * 3.8f / (distToTap / 100f).coerceAtLeast(0.3f))
+                    val fleeForce = Vector2D(position.x - tapPoint.x, position.y - tapPoint.y).normalize().mult(config.maxSpeed * 3.5f / (distToTap / 100f).coerceAtLeast(0.3f))
                     acceleration.add(fleeForce)
                 }
             }
@@ -142,29 +142,29 @@ class FishEntity(
         // Поведение пряток в ближайшую пещеру
         if (config.behavior == BehaviorType.HIDER) {
             caves.minByOrNull { it.pos.dist(position) }?.let { cave ->
-                if (cave.pos.dist(position) < 350f) {
-                    val hideVec = Vector2D(cave.pos.x - position.x, cave.pos.y - position.y).normalize().mult(config.maxSpeed * 0.7f)
+                if (cave.pos.dist(position) < 300f) {
+                    val hideVec = Vector2D(cave.pos.x - position.x, cave.pos.y - position.y).normalize().mult(config.maxSpeed * 0.6f)
                     acceleration.add(hideVec)
                 }
             }
         }
 
         // Авто-wander (Хаотичное блуждание)
-        acceleration.add(Vector2D((Random.nextFloat() - 0.5f) * 0.5f, (Random.nextFloat() - 0.5f) * 0.5f))
+        acceleration.add(Vector2D((Random.nextFloat() - 0.5f) * 0.4f, (Random.nextFloat() - 0.5f) * 0.4f))
 
         // Физическое движение
         velocity.add(acceleration)
-        val currentMaxSpeed = if (isAttacking) config.maxSpeed * 3.0f else config.maxSpeed
+        val currentMaxSpeed = if (isAttacking) config.maxSpeed * 2.8f else config.maxSpeed
         velocity.limit(currentMaxSpeed)
         position.add(velocity)
         acceleration.mult(0f)
 
         // Отталкивание от стенок аквариума
-        val margin = 100f
-        if (position.x < margin) velocity.x += 0.9f
-        if (position.x > w - margin) velocity.x -= 0.9f
-        if (position.y < margin) velocity.y += 0.9f
-        if (position.y > h - margin && config.behavior != BehaviorType.BOTTOM_DWELLER) velocity.y -= 0.9f
+        val margin = 80f
+        if (position.x < margin) velocity.x += 0.8f
+        if (position.x > w - margin) velocity.x -= 0.8f
+        if (position.y < margin) velocity.y += 0.8f
+        if (position.y > h - margin && config.behavior != BehaviorType.BOTTOM_DWELLER) velocity.y -= 0.8f
 
         // Донные обитатели держатся пола
         if (config.behavior == BehaviorType.BOTTOM_DWELLER) {
@@ -177,7 +177,7 @@ class FishEntity(
 
     private fun updateSpineIK() {
         spine[0] = position.copy()
-        val segLen = 16f * config.sizeScale
+        val segLen = 15f * config.sizeScale
         for (i in 1 until spine.size) {
             val prev = spine[i - 1]
             val curr = spine[i]
@@ -191,7 +191,7 @@ class FishEntity(
         for (other in fishes) {
             if (other.config.id == config.id && other != this) {
                 val d = position.dist(other.position)
-                if (d in 0.1f..180f) {
+                if (d in 0.1f..160f) {
                     sep.add(Vector2D(position.x - other.position.x, position.y - other.position.y).normalize().div(d))
                     align.add(other.velocity)
                     center.add(other.position)
