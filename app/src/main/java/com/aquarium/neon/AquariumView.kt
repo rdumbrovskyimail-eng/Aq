@@ -2,6 +2,7 @@ package com.aquarium.neon
 
 import android.content.Context
 import android.graphics.*
+import android.os.Build
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
@@ -57,6 +58,7 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
     init {
         holder.addCallback(this)
+        holder.setFormat(PixelFormat.TRANSLUCENT)
         isFocusable = true
     }
 
@@ -167,7 +169,11 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             if (holder.surface.isValid && screenW > 0f && screenH > 0f) {
                 var canvas: Canvas? = null
                 try {
-                    canvas = holder.lockCanvas()
+                    canvas = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        holder.lockHardwareCanvas()
+                    } else {
+                        holder.lockCanvas()
+                    }
                     if (canvas != null) {
                         updatePhysics()
                         drawWorld(canvas)
