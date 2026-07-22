@@ -41,14 +41,4 @@ class MainActivity : AppCompatActivity() {
             )
         }
     }
-
-    override fun onResume() {
-        super.onResume()
-        aquariumView.startSimulation()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        aquariumView.stopSimulation()
-    }
 }
