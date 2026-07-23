@@ -81,5 +81,4 @@ object AppLogger {
             Log.e("NeonAquarium", "AppLogger log file error: ${e.message}")
         }
     }
-
 }
