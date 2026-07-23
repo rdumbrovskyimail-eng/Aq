@@ -9,7 +9,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.*
 import kotlin.random.Random
 
-class AquariumView @JunctionOverloads constructor(
+class AquariumView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
