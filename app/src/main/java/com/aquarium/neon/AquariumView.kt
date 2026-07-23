@@ -4,9 +4,9 @@ import android.content.Context
 import android.graphics.*
 import android.view.MotionEvent
 import android.view.View
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.*
 import kotlin.random.Random
-import java.util.concurrent.CopyOnWriteArrayList
 
 class AquariumView(context: Context) : View(context) {
 
@@ -22,8 +22,8 @@ class AquariumView(context: Context) : View(context) {
 
     private var screenW = 0f
     private var screenH = 0f
-    private var isWorldInitialized = false
-    private var isSimulating = false
+    @Volatile private var isWorldInitialized = false
+    @Volatile private var isSimulating = false
     private var frameTime = 0L
 
     private val fillPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -33,122 +33,140 @@ class AquariumView(context: Context) : View(context) {
         style = Paint.Style.FILL 
         color = Color.argb(40, 0, 0, 0)
     }
-    private val bgPaint     = Paint()
-    private val reusePath   = Path()
+    private val bgPaint   = Paint()
+    private val reusePath = Path()
 
     init {
         isFocusable = true
         isClickable = true
+        AppLogger.log("AquariumView initialized")
     }
 
     fun startSimulation() {
         if (!isSimulating) {
             isSimulating = true
+            AppLogger.log("AquariumView: Simulation started")
             postInvalidateOnAnimation()
         }
     }
 
     fun stopSimulation() {
         isSimulating = false
+        AppLogger.log("AquariumView: Simulation stopped")
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
+        AppLogger.log("AquariumView onSizeChanged: w=$w, h=$h")
         if (w > 0 && h > 0) {
             screenW = w.toFloat()
             screenH = h.toFloat()
             initWorld(screenW, screenH)
             isWorldInitialized = true
-            if (isSimulating) {
-                postInvalidateOnAnimation()
-            }
+            startSimulation()
         }
     }
 
     private fun initWorld(w: Float, h: Float) {
-        fishes.clear(); caves.clear(); anemones.clear()
-        bubbles.clear(); particles.clear(); corals.clear()
-        tapPoint = null
-        tapShockwave = 0f
+        AppLogger.log("AquariumView: initWorld start (${w}x${h})")
+        try {
+            fishes.clear(); caves.clear(); anemones.clear()
+            bubbles.clear(); particles.clear(); corals.clear()
+            tapPoint = null
+            tapShockwave = 0f
 
-        caves += CoralCave(Vector2D(w * 0.15f, h - 90f),  170f, Color.parseColor("#00E5FF"))
-        caves += CoralCave(Vector2D(w * 0.85f, h - 105f), 195f, Color.parseColor("#FF0077"))
+            caves += CoralCave(Vector2D(w * 0.15f, h - 90f),  170f, Color.parseColor("#00E5FF"))
+            caves += CoralCave(Vector2D(w * 0.85f, h - 105f), 195f, Color.parseColor("#FF0077"))
 
-        for (i in 0..5) {
-            anemones += AnemoneTentacle(
-                Vector2D(w * (0.18f + i * 0.13f), h - 50f),
-                tentacleCount = 14 + Random.nextInt(4),
-                length = 110f + Random.nextFloat() * 40f
-            )
-        }
-
-        repeat(80) {
-            val r = 1.5f + Random.nextFloat() * 4f
-            bubbles += Bubble(
-                x = Random.nextFloat() * w,
-                y = Random.nextFloat() * h,
-                radius = r,
-                speedY = 1.4f + (5.5f - r) * 0.3f,
-                wobble = 0.008f + Random.nextFloat() * 0.018f
-            )
-        }
-
-        val coralColors = listOf(
-            Color.parseColor("#FF0077"), Color.parseColor("#FF5500"),
-            Color.parseColor("#00E5FF"), Color.parseColor("#B388FF"),
-            Color.parseColor("#00C853"), Color.parseColor("#FFAB40")
-        )
-        repeat(18) {
-            val cx = w * 0.04f + Random.nextFloat() * w * 0.92f
-            val cy = h - 30f
-            val col = coralColors[Random.nextInt(coralColors.size)]
-            val branches = (0 until 3 + Random.nextInt(5)).map {
-                val ang = -PI.toFloat() / 2f + (Random.nextFloat() - 0.5f) * 1.4f
-                val len = 40f + Random.nextFloat() * 80f
-                Triple(cx + cos(ang) * len, cy + sin(ang) * len, 2f + Random.nextFloat() * 4f)
-            }
-            corals += CoralPlant(cx, cy, col, branches)
-        }
-
-        for (species in FishSpeciesRegistry.ALL_SPECIES) {
-            val count = when (species.behavior) {
-                BehaviorType.FLOCKING       -> Random.nextInt(3, 6)
-                BehaviorType.SOLITARY       -> 1
-                BehaviorType.AGGRESSIVE     -> 1
-                BehaviorType.PREDATOR       -> 1
-                BehaviorType.BOTTOM_DWELLER -> Random.nextInt(1, 3)
-                BehaviorType.HIDER          -> Random.nextInt(1, 3)
-            }
-            repeat(count) {
-                fishes += FishEntity(
-                    species,
-                    Vector2D(100f + Random.nextFloat() * (w - 200f), 100f + Random.nextFloat() * (h - 200f))
+            for (i in 0..5) {
+                anemones += AnemoneTentacle(
+                    Vector2D(w * (0.18f + i * 0.13f), h - 50f),
+                    tentacleCount = 14 + Random.nextInt(4),
+                    length = 110f + Random.nextFloat() * 40f
                 )
             }
-        }
 
-        bgPaint.shader = LinearGradient(
-            0f, 0f, 0f, h,
-            intArrayOf(
-                0xFF002B47.toInt(),
-                0xFF00182E.toInt(),
-                0xFF000A1A.toInt()
-            ),
-            null, Shader.TileMode.CLAMP
-        )
+            repeat(80) {
+                val r = 1.5f + Random.nextFloat() * 4f
+                bubbles += Bubble(
+                    x = Random.nextFloat() * w,
+                    y = Random.nextFloat() * h,
+                    radius = r,
+                    speedY = 1.4f + (5.5f - r) * 0.3f,
+                    wobble = 0.008f + Random.nextFloat() * 0.018f
+                )
+            }
+
+            val coralColors = listOf(
+                Color.parseColor("#FF0077"), Color.parseColor("#FF5500"),
+                Color.parseColor("#00E5FF"), Color.parseColor("#B388FF"),
+                Color.parseColor("#00C853"), Color.parseColor("#FFAB40")
+            )
+            repeat(18) {
+                val cx = w * 0.04f + Random.nextFloat() * w * 0.92f
+                val cy = h - 30f
+                val col = coralColors[Random.nextInt(coralColors.size)]
+                val branches = (0 until 3 + Random.nextInt(5)).map {
+                    val ang = -PI.toFloat() / 2f + (Random.nextFloat() - 0.5f) * 1.4f
+                    val len = 40f + Random.nextFloat() * 80f
+                    Triple(cx + cos(ang) * len, cy + sin(ang) * len, 2f + Random.nextFloat() * 4f)
+                }
+                corals += CoralPlant(cx, cy, col, branches)
+            }
+
+            for (species in FishSpeciesRegistry.ALL_SPECIES) {
+                val count = when (species.behavior) {
+                    BehaviorType.FLOCKING       -> Random.nextInt(2, 4)
+                    BehaviorType.SOLITARY       -> 1
+                    BehaviorType.AGGRESSIVE     -> 1
+                    BehaviorType.PREDATOR       -> 1
+                    BehaviorType.BOTTOM_DWELLER -> Random.nextInt(1, 2)
+                    BehaviorType.HIDER          -> Random.nextInt(1, 2)
+                }
+                repeat(count) {
+                    fishes += FishEntity(
+                        species,
+                        Vector2D(100f + Random.nextFloat() * (w - 200f).coerceAtLeast(10f), 100f + Random.nextFloat() * (h - 200f).coerceAtLeast(10f))
+                    )
+                }
+            }
+
+            bgPaint.shader = LinearGradient(
+                0f, 0f, 0f, h,
+                intArrayOf(
+                    0xFF002B47.toInt(),
+                    0xFF00182E.toInt(),
+                    0xFF000A1A.toInt()
+                ),
+                null, Shader.TileMode.CLAMP
+            )
+            AppLogger.log("AquariumView: initWorld success. Fish count: ${fishes.size}")
+        } catch (e: Exception) {
+            AppLogger.log("AquariumView initWorld ERROR: ${e.message}")
+            e.printStackTrace()
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if (!isWorldInitialized || screenW <= 0f || screenH <= 0f) return
 
-        if (isSimulating) {
-            updatePhysics()
+        if (!isWorldInitialized || screenW <= 0f || screenH <= 0f) {
+            // Гарантия, что анимация не "умрет", если кадр вызвался до инициализации
+            if (isSimulating) postInvalidateOnAnimation()
+            return
         }
-        drawWorld(canvas)
 
-        if (isSimulating) {
-            postInvalidateOnAnimation()
+        try {
+            if (isSimulating) {
+                updatePhysics()
+            }
+            drawWorld(canvas)
+        } catch (e: Exception) {
+            AppLogger.log("AquariumView onDraw ERROR: ${e.message}")
+        } finally {
+            if (isSimulating) {
+                postInvalidateOnAnimation()
+            }
         }
     }
 
