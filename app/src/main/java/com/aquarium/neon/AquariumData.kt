@@ -63,7 +63,7 @@ object FishSpeciesRegistry {
         SpeciesConfig(21, "Powder Blue Surgeon",       Color.parseColor("#00B0FF"), Color.parseColor("#E0F7FA"), Color.BLACK,   VisualForm.SLENDER_NEON,  4.5f, BehaviorType.FLOCKING,       1.7f),
         SpeciesConfig(22, "Fire Goby Dart",            Color.parseColor("#FF1744"), Color.parseColor("#FF9100"), Color.WHITE,   VisualForm.SLENDER_NEON,  6.5f, BehaviorType.HIDER,         1.3f),
         SpeciesConfig(23, "Neon Manta Ray",            Color.parseColor("#1A237E"), Color.parseColor("#00E5FF"), Color.WHITE,   VisualForm.MANTA_RAY,     2.8f, BehaviorType.SOLITARY,       4.2f),
-        SpeciesConfig(24, "Transparent Glass Catfish", Color.parseColor("#88EEFFFF"), Color.parseColor("#00E5FF"), Color.MAGENTA, VisualForm.SLENDER_NEON, 4.0f, BehaviorType.FLOCKING,      1.6f),
+        SpeciesConfig(24, "Transparent Glass Catfish", Color.parseColor("#30FFFFFF"), Color.parseColor("#00E5FF"), Color.MAGENTA, VisualForm.SLENDER_NEON, 4.0f, BehaviorType.FLOCKING,      1.6f),
         SpeciesConfig(25, "Royal Gramma Bicolor",      Color.parseColor("#651FFF"), Color.parseColor("#B388FF"), Color.YELLOW,  VisualForm.SLENDER_NEON,  3.4f, BehaviorType.HIDER,         1.4f),
         SpeciesConfig(26, "Emperor Circle Angel",      Color.parseColor("#3D5AFE"), Color.parseColor("#8C9EFF"), Color.YELLOW,  VisualForm.TALL_DISC,     2.5f, BehaviorType.SOLITARY,       2.8f),
         SpeciesConfig(27, "Beaked Butterfly Fish",     Color.parseColor("#FF9100"), Color.parseColor("#FFE0B2"), Color.WHITE,   VisualForm.TALL_DISC,     2.9f, BehaviorType.SOLITARY,       2.2f),
@@ -73,7 +73,7 @@ object FishSpeciesRegistry {
         SpeciesConfig(31, "Peacock Mantis Strike",     Color.parseColor("#00C853"), Color.parseColor("#B2FF59"), Color.RED,     VisualForm.SHRIMP_MANTIS, 4.8f, BehaviorType.AGGRESSIVE,    1.7f),
         SpeciesConfig(32, "Electric Cyan Cichlid",     Color.parseColor("#00E5FF"), Color.parseColor("#80D8FF"), Color.BLUE,    VisualForm.SLENDER_NEON,  4.8f, BehaviorType.AGGRESSIVE,    1.9f),
         SpeciesConfig(33, "Comb Rainbow Jelly",        Color.parseColor("#18FFFF"), Color.parseColor("#FF4081"), Color.GREEN,   VisualForm.JELLY_GLOW,    1.0f, BehaviorType.SOLITARY,       2.6f),
-        SpeciesConfig(34, "Harlequin Glowing Shrimp",  Color.parseColor("#FFCCEE"), Color.parseColor("#FF80AB"), Color.CYAN,   VisualForm.SHRIMP_MANTIS, 1.8f, BehaviorType.BOTTOM_DWELLER, 1.2f),
+        SpeciesConfig(34, "Harlequin Glowing Shrimp",  Color.parseColor("#FFFFFF"), Color.parseColor("#FF80AB"), Color.CYAN,   VisualForm.SHRIMP_MANTIS, 1.8f, BehaviorType.BOTTOM_DWELLER, 1.2f),
         SpeciesConfig(35, "Neon Yellow Watchman",      Color.parseColor("#FFD600"), Color.parseColor("#FFFF80"), Color.BLUE,    VisualForm.SLENDER_NEON,  2.4f, BehaviorType.HIDER,         1.4f)
     )
 }
@@ -96,26 +96,6 @@ class AnemoneTentacle(
     }
 }
 
-data class Bubble(
-    var x: Float, var y: Float,
-    val radius: Float,
-    val speedY: Float,
-    val wobble: Float
-)
-
-data class ImpactParticle(
-    var x: Float, var y: Float,
-    var vx: Float, var vy: Float,
-    var life: Float,
-    val color: Int
-)
-
-data class CoralPlant(
-    val x: Float, val y: Float,
-    val color: Int,
-    val branches: List<Triple<Float, Float, Float>>
-)
-
 class FishEntity(
     val config: SpeciesConfig,
     var position: Vector2D,
@@ -129,7 +109,6 @@ class FishEntity(
     var swimCycle = Random.nextFloat() * 100f
     var isAttacking = false
     var attackCooldown = 0
-    val depth = Random.nextFloat()
 
     init {
         val segLen = 15f * config.sizeScale
@@ -148,6 +127,7 @@ class FishEntity(
         w: Float, h: Float,
         fishes: List<FishEntity>,
         caves: List<CoralCave>,
+        anemones: List<AnemoneTentacle>,
         tapPoint: Vector2D?
     ) {
         swimCycle += config.finFrequency
@@ -187,27 +167,22 @@ class FishEntity(
             }
         }
 
-        acceleration.add(Vector2D((Random.nextFloat() - 0.5f) * 0.5f, (Random.nextFloat() - 0.5f) * 0.5f))
-        val waterFriction = 0.98f
+        acceleration.add(Vector2D((Random.nextFloat() - 0.5f) * 0.4f, (Random.nextFloat() - 0.5f) * 0.4f))
         val currentMaxSpeed = if (isAttacking) config.maxSpeed * 3.0f else config.maxSpeed
         velocity.add(acceleration)
-        velocity.mult(waterFriction)
-        if (velocity.mag() > currentMaxSpeed) {
-            velocity.normalize().mult(currentMaxSpeed)
-        }
+        velocity.limit(currentMaxSpeed)
         position.add(velocity)
         acceleration.mult(0f)
 
         val margin = 80f
-        if (position.x < margin)     velocity.x += 1.2f
-        if (position.x > w - margin) velocity.x -= 1.2f
-        if (position.y < margin)     velocity.y += 1.2f
+        if (position.x < margin)     velocity.x += 0.9f
+        if (position.x > w - margin) velocity.x -= 0.9f
+        if (position.y < margin)     velocity.y += 0.9f
         if (position.y > h - margin && config.behavior != BehaviorType.BOTTOM_DWELLER)
-            velocity.y -= 1.2f
+            velocity.y -= 0.9f
 
         if (config.behavior == BehaviorType.BOTTOM_DWELLER) {
-            position.y = position.y * 0.85f + (h - 80f) * 0.15f
-            velocity.y *= 0.6f
+            position.y = position.y * 0.90f + (h - 70f) * 0.10f
         }
 
         updateSpineIK()
@@ -250,9 +225,9 @@ class FishEntity(
         }
         if (count > 0) {
             val cf = count.toFloat()
-            sep.div(cf).normalize().mult(config.maxSpeed * 1.6f)
-            align.div(cf).normalize().mult(config.maxSpeed * 0.9f)
-            center.div(cf).sub(position).normalize().mult(config.maxSpeed * 0.5f)
+            sep.div(cf).normalize().mult(config.maxSpeed)
+            align.div(cf).normalize().mult(config.maxSpeed)
+            center.div(cf).sub(position).normalize().mult(config.maxSpeed)
             acceleration.add(sep).add(align).add(center)
         }
     }
