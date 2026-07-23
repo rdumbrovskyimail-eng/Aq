@@ -13,84 +13,75 @@ import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import java.io.File
-import java.io.FileOutputStream
-import java.io.PrintWriter
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var aquariumView: AquariumView
-    private val logFileName = "crash_log.txt"
 
     private val createDocumentLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             result.data?.data?.let { uri ->
-                saveLogToUserSelectedFolder(uri)
+                saveLogToSelectedUri(uri)
             }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppLogger.log("MainActivity: onCreate started")
         
-        setupCrashHandler()
         setupImmersiveMode()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         aquariumView = AquariumView(this)
         setContentView(aquariumView)
+        AppLogger.log("MainActivity: setContentView attached AquariumView")
 
+        // Вызов сохранения логов ровно через 5 секунд
         Handler(Looper.getMainLooper()).postDelayed({
-            promptUserForLogDirectory()
-        }, 10000)
+            if (!isFinishing && !isDestroyed) {
+                AppLogger.log("MainActivity: 5-second timer triggered log prompt")
+                showSaveLogDialog()
+            }
+        }, 5000)
     }
 
-    private fun setupCrashHandler() {
-        Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
-            try {
-                val cacheLogFile = File(cacheDir, logFileName)
-                val pw = PrintWriter(FileOutputStream(cacheLogFile, true))
-                pw.println("--- CRASH at ${java.util.Date()} ---")
-                throwable.printStackTrace(pw)
-                pw.close()
-            } catch (e: Exception) {
-                e.printStackTrace()
+    private fun showSaveLogDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Диагностика аквариума")
+            .setMessage("Прошло 5 секунд работы. Желаете сохранить лог запуска и работы приложения в файл?")
+            .setPositiveButton("Сохранить лог") { _, _ ->
+                promptUserForLogDirectory()
             }
-        }
+            .setNegativeButton("Отмена", null)
+            .setCancelable(false)
+            .show()
     }
 
     private fun promptUserForLogDirectory() {
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "text/plain"
-            putExtra(Intent.EXTRA_TITLE, logFileName)
+            putExtra(Intent.EXTRA_TITLE, AppLogger.LOG_FILE_NAME)
         }
         createDocumentLauncher.launch(intent)
     }
 
-    private fun saveLogToUserSelectedFolder(uri: Uri) {
+    private fun saveLogToSelectedUri(uri: Uri) {
         try {
-            val cacheLogFile = File(cacheDir, logFileName)
-            
-            val logContent = if (cacheLogFile.exists()) {
-                cacheLogFile.readText()
-            } else {
-                "Крашей не зафиксировано. Поток отрисовки работает стабильно!\n"
+            val logData = AppLogger.getFullLog()
+            contentResolver.openOutputStream(uri)?.use { os ->
+                os.write(logData.toByteArray())
             }
-
-            contentResolver.openOutputStream(uri)?.use { outputStream ->
-                outputStream.write(logContent.toByteArray())
-            }
-            Toast.makeText(this, "Лог сохранен!", Toast.LENGTH_LONG).show()
-            
-            if (cacheLogFile.exists()) cacheLogFile.delete()
-            
+            Toast.makeText(this, "Лог успешно сохранен!", Toast.LENGTH_LONG).show()
+            AppLogger.log("MainActivity: Log file written successfully to URI: $uri")
         } catch (e: Exception) {
-            e.printStackTrace()
-            Toast.makeText(this, "Ошибка сохранения лога", Toast.LENGTH_SHORT).show()
+            AppLogger.log("MainActivity ERROR saving log: ${e.message}")
+            Toast.makeText(this, "Ошибка сохранения лога: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -116,11 +107,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        AppLogger.log("MainActivity: onResume")
         aquariumView.startSimulation()
     }
 
     override fun onPause() {
         super.onPause()
+        AppLogger.log("MainActivity: onPause")
         aquariumView.stopSimulation()
     }
 }
