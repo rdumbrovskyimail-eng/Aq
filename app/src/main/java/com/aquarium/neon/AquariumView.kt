@@ -15,8 +15,8 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     @Volatile private var isRunning = false
 
     private val fishes = CopyOnWriteArrayList<FishEntity>()
-    private val caves = mutableListOf<CoralCave>()
-    private val anemones = mutableListOf<AnemoneTentacle>()
+    private val caves = CopyOnWriteArrayList<CoralCave>()
+    private val anemones = CopyOnWriteArrayList<AnemoneTentacle>()
     
     private var tapPoint: Vector2D? = null
     private var tapShockwave = 0f
@@ -40,6 +40,7 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {
         if (w > 0 && h > 0 && (!isWorldInitialized || screenW != w.toFloat() || screenH != h.toFloat())) {
+            stopSimulation()
             screenW = w.toFloat()
             screenH = h.toFloat()
             initAquariumWorld(screenW, screenH)
