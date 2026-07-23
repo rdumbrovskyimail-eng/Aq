@@ -14,7 +14,6 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     private var renderThread: Thread? = null
     @Volatile private var isRunning = false
 
-    // Потокобезопасный список для предотвращения ConcurrentModificationException
     private val fishes = CopyOnWriteArrayList<FishEntity>()
     private val caves = mutableListOf<CoralCave>()
     private val anemones = mutableListOf<AnemoneTentacle>()
