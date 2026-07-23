@@ -22,8 +22,6 @@ class MainActivity : AppCompatActivity() {
         setContentView(aquariumView)
     }
 
-
-
     private fun setupImmersiveMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.setDecorFitsSystemWindows(false)
