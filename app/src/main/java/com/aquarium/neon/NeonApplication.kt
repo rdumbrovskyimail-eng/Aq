@@ -82,18 +82,4 @@ object AppLogger {
         }
     }
 
-    @Synchronized
-    fun getFullLog(): String {
-        return try {
-            val dir = cacheDirFile ?: NeonApplication.appContext?.cacheDir
-            val file = if (dir != null) File(dir, LOG_FILE_NAME) else null
-            if (file != null && file.exists()) {
-                file.readText()
-            } else {
-                logMemoryBuffer.toString()
-            }
-        } catch (e: Exception) {
-            logMemoryBuffer.toString()
-        }
-    }
 }
