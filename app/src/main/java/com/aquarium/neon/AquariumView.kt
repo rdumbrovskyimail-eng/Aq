@@ -2,13 +2,18 @@ package com.aquarium.neon
 
 import android.content.Context
 import android.graphics.*
+import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.*
 import kotlin.random.Random
 
-class AquariumView(context: Context) : View(context) {
+class AquariumView @JunctionOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0
+) : View(context, attrs, defStyleAttr) {
 
     private var tapPoint: Vector2D? = null
     private var tapShockwave = 0f
@@ -124,9 +129,11 @@ class AquariumView(context: Context) : View(context) {
                     BehaviorType.HIDER          -> Random.nextInt(1, 2)
                 }
                 repeat(count) {
+                    val spawnW = (w - 200f).coerceAtLeast(100f)
+                    val spawnH = (h - 200f).coerceAtLeast(100f)
                     fishes += FishEntity(
                         species,
-                        Vector2D(100f + Random.nextFloat() * (w - 200f).coerceAtLeast(10f), 100f + Random.nextFloat() * (h - 200f).coerceAtLeast(10f))
+                        Vector2D(100f + Random.nextFloat() * (spawnW - 50f), 100f + Random.nextFloat() * (spawnH - 50f))
                     )
                 }
             }
@@ -140,7 +147,7 @@ class AquariumView(context: Context) : View(context) {
                 ),
                 null, Shader.TileMode.CLAMP
             )
-            AppLogger.log("AquariumView: initWorld success. Fish count: ${fishes.size}")
+            AppLogger.log("AquariumView: initWorld success. Total fishes: ${fishes.size}")
         } catch (e: Exception) {
             AppLogger.log("AquariumView initWorld ERROR: ${e.message}")
             e.printStackTrace()
@@ -151,7 +158,6 @@ class AquariumView(context: Context) : View(context) {
         super.onDraw(canvas)
 
         if (!isWorldInitialized || screenW <= 0f || screenH <= 0f) {
-            // Гарантия, что анимация не "умрет", если кадр вызвался до инициализации
             if (isSimulating) postInvalidateOnAnimation()
             return
         }
@@ -393,10 +399,11 @@ class AquariumView(context: Context) : View(context) {
     override fun performClick(): Boolean { super.performClick(); return true }
 
     private fun blendColors(color1: Int, color2: Int, ratio: Float): Int {
-        val inverseRatio = 1f - ratio
-        val r = (Color.red(color1) * inverseRatio + Color.red(color2) * ratio).toInt()
-        val g = (Color.green(color1) * inverseRatio + Color.green(color2) * ratio).toInt()
-        val b = (Color.blue(color1) * inverseRatio + Color.blue(color2) * ratio).toInt()
+        val rRatio = ratio.coerceIn(0f, 1f)
+        val inverseRatio = 1f - rRatio
+        val r = (Color.red(color1) * inverseRatio + Color.red(color2) * rRatio).toInt().coerceIn(0, 255)
+        val g = (Color.green(color1) * inverseRatio + Color.green(color2) * rRatio).toInt().coerceIn(0, 255)
+        val b = (Color.blue(color1) * inverseRatio + Color.blue(color2) * rRatio).toInt().coerceIn(0, 255)
         return Color.rgb(r, g, b)
     }
 }
