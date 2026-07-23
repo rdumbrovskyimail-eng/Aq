@@ -41,10 +41,10 @@ class MainActivity : AppCompatActivity() {
         setContentView(aquariumView)
         AppLogger.log("MainActivity: setContentView attached AquariumView")
 
-        // Вызов сохранения логов ровно через 5 секунд
+        // Запуск таймера на 5 секунд
         Handler(Looper.getMainLooper()).postDelayed({
             if (!isFinishing && !isDestroyed) {
-                AppLogger.log("MainActivity: 5-second timer triggered log prompt")
+                AppLogger.log("MainActivity: 5-second timer triggered dialog")
                 showSaveLogDialog()
             }
         }, 5000)
@@ -53,11 +53,11 @@ class MainActivity : AppCompatActivity() {
     private fun showSaveLogDialog() {
         AlertDialog.Builder(this)
             .setTitle("Диагностика аквариума")
-            .setMessage("Прошло 5 секунд работы. Желаете сохранить лог запуска и работы приложения в файл?")
+            .setMessage("Приложение отработало 5 секунд. Сохранить диагностический лог в файл?")
             .setPositiveButton("Сохранить лог") { _, _ ->
                 promptUserForLogDirectory()
             }
-            .setNegativeButton("Отмена", null)
+            .setNegativeButton("Закрыть", null)
             .setCancelable(false)
             .show()
     }
@@ -77,8 +77,8 @@ class MainActivity : AppCompatActivity() {
             contentResolver.openOutputStream(uri)?.use { os ->
                 os.write(logData.toByteArray())
             }
-            Toast.makeText(this, "Лог успешно сохранен!", Toast.LENGTH_LONG).show()
-            AppLogger.log("MainActivity: Log file written successfully to URI: $uri")
+            Toast.makeText(this, "Лог сохранен!", Toast.LENGTH_LONG).show()
+            AppLogger.log("MainActivity: Log successfully saved to URI: $uri")
         } catch (e: Exception) {
             AppLogger.log("MainActivity ERROR saving log: ${e.message}")
             Toast.makeText(this, "Ошибка сохранения лога: ${e.message}", Toast.LENGTH_SHORT).show()
