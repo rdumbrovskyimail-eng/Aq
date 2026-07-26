@@ -110,7 +110,8 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         while (isRunning) {
             val startTime = System.currentTimeMillis()
 
-            if (holder.surface.isValid && screenW > 0f && screenH > 0f) {
+            val surf = holder.surface
+            if (surf != null && surf.isValid && screenW > 0f && screenH > 0f) {
                 var canvas: Canvas? = null
                 try {
                     canvas = holder.lockCanvas()
