@@ -51,4 +51,4 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
         aquariumView.stopSimulation()
     }
-}
+} 
