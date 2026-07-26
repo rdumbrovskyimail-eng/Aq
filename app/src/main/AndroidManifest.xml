@@ -5,6 +5,7 @@
     <uses-feature android:name="android.software.leanback" android:required="false" />
 
     <application
+        android:name=".NeonApplication"
         android:allowBackup="true"
         android:label="Neon Aquarium Ultra"
         android:supportsRtl="true"
