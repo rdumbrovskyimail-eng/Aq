@@ -14,6 +14,7 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     private var renderThread: Thread? = null
     @Volatile private var isRunning = false
 
+    // Потокобезопасные коллекции для параллельного доступа из UI и Render потоков
     private val fishes = CopyOnWriteArrayList<FishEntity>()
     private val caves = CopyOnWriteArrayList<CoralCave>()
     private val anemones = CopyOnWriteArrayList<AnemoneTentacle>()
