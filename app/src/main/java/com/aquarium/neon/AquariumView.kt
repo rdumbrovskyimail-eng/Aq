@@ -321,10 +321,14 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.action == MotionEvent.ACTION_DOWN || event.action == MotionEvent.ACTION_MOVE) {
-            tapPoint = Vector2D(event.x, event.y)
-            tapShockwave = 10f
-            performClick()
+        when (event.action) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                tapPoint = Vector2D(event.x, event.y)
+                tapShockwave = 10f
+            }
+            MotionEvent.ACTION_UP -> {
+                performClick()
+            }
         }
         return true
     }
