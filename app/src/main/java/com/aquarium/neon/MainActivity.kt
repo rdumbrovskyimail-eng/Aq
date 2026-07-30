@@ -20,15 +20,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 1. Создаем View и устанавливаем его в окно
         aquariumView = AquariumView(this)
         setContentView(aquariumView)
 
-        // 2. Настраиваем полноэкранный режим СТРОГО ПОСЛЕ setContentView
         setupImmersiveMode()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // 3. Инициализируем акселерометр
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
     }
