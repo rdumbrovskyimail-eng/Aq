@@ -1,115 +1,198 @@
 package com.aquarium.neon
 
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Path
-import kotlin.math.sin
+import android.graphics.*
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioTrack
+import kotlin.math.*
+import kotlin.random.Random
 
-class VerletNode(
-    var x: Float,
-    var y: Float,
-    var oldX: Float = x,
-    var oldY: Float = y,
-    var isPinned: Boolean = false,
-    val width: Float = 4f
+class FoodParticle(
+    var position: Vector2D,
+    var velocity: Vector2D = Vector2D((Random.nextFloat() - 0.5f) * 0.5f, Random.nextFloat() * 0.7f + 0.5f),
+    val color: Int = if (Random.nextBoolean()) Color.parseColor("#FF9800") else Color.parseColor("#E91E63"),
+    val radius: Float = Random.nextFloat() * 3f + 4f
 ) {
-    fun update(gravityX: Float, gravityY: Float, drag: Float = 0.95f) {
-        if (isPinned) return
-        val vx = (x - oldX) * drag + gravityX
-        val vy = (y - oldY) * drag + gravityY
-        oldX = x
-        oldY = y
-        x += vx
-        y += vy
-    }
-}
+    var isEaten = false
 
-class VerletLink(
-    val p1: VerletNode,
-    val p2: VerletNode,
-    val length: Float,
-    val stiffness: Float = 0.85f
-) {
-    fun solve() {
-        val dx = p2.x - p1.x
-        val dy = p2.y - p1.y
-        val dist = Math.hypot(dx.toDouble(), dy.toDouble()).toFloat().coerceAtLeast(0.001f)
-        val delta = (dist - length) / dist
-
-        if (!p1.isPinned) {
-            p1.x += dx * 0.5f * delta * stiffness
-            p1.y += dy * 0.5f * delta * stiffness
-        }
-        if (!p2.isPinned) {
-            p2.x -= dx * 0.5f * delta * stiffness
-            p2.y -= dy * 0.5f * delta * stiffness
-        }
-    }
-}
-
-class PlantStem(
-    val rootX: Float,
-    val rootY: Float,
-    val segmentCount: Int = 14,
-    val segmentLength: Float = 16f,
-    val color: Int,
-    val baseWidth: Float = 16f
-) {
-    val nodes = ArrayList<VerletNode>()
-    val links = ArrayList<VerletLink>()
-    private val path = Path()
-
-    init {
-        for (i in 0 until segmentCount) {
-            val w = baseWidth * (1f - (i.toFloat() / segmentCount) * 0.75f)
-            val node = VerletNode(rootX, rootY - i * segmentLength, isPinned = (i == 0), width = w)
-            nodes.add(node)
-        }
-        for (i in 0 until segmentCount - 1) {
-            links.add(VerletLink(nodes[i], nodes[i + 1], segmentLength))
-        }
-    }
-
-    fun update(time: Float, currentX: Float, currentY: Float, touchPoint: Vector2D?) {
-        val waveFactor = sin(time * 2.2f + rootX * 0.04f) * 0.45f
-        val buoyX = currentX + waveFactor
-        val buoyY = -0.18f + currentY
-
-        for (node in nodes) {
-            node.update(buoyX, buoyY)
-            if (touchPoint != null) {
-                val d = Math.hypot((node.x - touchPoint.x).toDouble(), (node.y - touchPoint.y).toDouble()).toFloat()
-                if (d < 200f && d > 1f) {
-                    val push = (200f - d) / 200f * 5.0f
-                    node.x += (node.x - touchPoint.x) / d * push
-                    node.y += (node.y - touchPoint.y) / d * push
-                }
-            }
-        }
-
-        repeat(5) {
-            for (link in links) link.solve()
+    fun update(accX: Float, accY: Float, bottomY: Float) {
+        if (position.y < bottomY - radius) {
+            velocity.x = velocity.x * 0.96f + (accX + sin(position.y * 0.04f) * 0.3f) * 0.04f
+            velocity.y = (velocity.y * 0.98f + 0.45f + accY * 0.15f).coerceAtMost(2.2f)
+            position.add(velocity)
+        } else {
+            velocity.set(0f, 0f)
+            position.y = bottomY - radius
         }
     }
 
     fun draw(canvas: Canvas, paint: Paint) {
-        if (nodes.isEmpty()) return
+        paint.style = Paint.Style.FILL
         paint.color = color
-        paint.style = Paint.Style.STROKE
-        paint.strokeCap = Paint.Cap.ROUND
+        canvas.drawCircle(position.x, position.y, radius, paint)
+        paint.color = Color.argb(160, 255, 255, 255)
+        canvas.drawCircle(position.x - radius * 0.3f, position.y - radius * 0.3f, radius * 0.3f, paint)
+    }
+}
+
+class PlanktonParticle(
+    var position: Vector2D,
+    val radius: Float = Random.nextFloat() * 2.2f + 1f,
+    val depth: Float = Random.nextFloat()
+) {
+    private var phase = Random.nextFloat() * 10f
+
+    fun update(w: Float, h: Float, accX: Float, accY: Float) {
+        phase += 0.02f
+        val depthSpeed = (0.3f + depth * 0.7f)
+        position.x += sin(phase) * 0.5f * depthSpeed + accX * 0.3f
+        position.y -= 0.3f * depthSpeed - accY * 0.1f
+
+        if (position.y < -10f) position.y = h + 10f
+        if (position.x < -10f) position.x = w + 10f
+        if (position.x > w + 10f) position.x = -10f
+    }
+
+    fun draw(canvas: Canvas, paint: Paint) {
+        paint.style = Paint.Style.FILL
+        val alpha = ((sin(phase) * 0.35f + 0.55f) * (100 + depth * 155)).toInt().coerceIn(0, 255)
+        paint.color = Color.argb(alpha, 0, 229, 255)
+        canvas.drawCircle(position.x, position.y, radius * (0.6f + depth * 0.4f), paint)
+    }
+}
+
+class VolumetricLightShafts {
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val path = Path()
+
+    fun draw(canvas: Canvas, w: Float, h: Float, timeSec: Float, intensityMultiplier: Float = 1.0f) {
+        val shaftCount = 8
+        for (i in 0 until shaftCount) {
+            val baseStartX = (w / (shaftCount - 1)) * i
+            val shift = sin(timeSec * 0.6f + i * 1.4f) * 70f
+            val topX1 = baseStartX + shift - 40f
+            val topX2 = baseStartX + shift + 80f
+            val bottomX1 = topX1 + 180f
+            val bottomX2 = topX2 + 250f
+
+            val alpha = ((sin(timeSec * 1.1f + i * 1.9f) * 0.035f + 0.065f) * intensityMultiplier * 255).toInt().coerceIn(0, 80)
+
+            path.reset()
+            path.moveTo(topX1, 0f)
+            path.lineTo(topX2, 0f)
+            path.lineTo(bottomX2, h)
+            path.lineTo(bottomX1, h)
+            path.close()
+
+            val lg = LinearGradient(
+                (topX1 + topX2) / 2f, 0f,
+                (bottomX1 + bottomX2) / 2f, h,
+                intArrayOf(Color.argb(alpha, 180, 245, 255), Color.argb(0, 0, 80, 180)),
+                null, Shader.TileMode.CLAMP
+            )
+            paint.shader = lg
+            canvas.drawPath(path, paint)
+        }
+        paint.shader = null
+    }
+}
+
+class SeabedCaustics {
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val path = Path()
+
+    fun draw(canvas: Canvas, w: Float, h: Float, timeSec: Float, colorAlpha: Int = 30) {
+        paint.color = Color.argb(colorAlpha, 0, 230, 255)
+        paint.strokeWidth = 3f
+
+        val seabedY = h - 85f
+        val cols = 16
+        val colWidth = w / cols
 
         path.reset()
-        path.moveTo(nodes[0].x, nodes[0].y)
-        for (i in 1 until nodes.size) {
-            val prev = nodes[i - 1]
-            val curr = nodes[i]
-            val midX = (prev.x + curr.x) / 2f
-            val midY = (prev.y + curr.y) / 2f
-            path.quadTo(prev.x, prev.y, midX, midY)
-        }
-        path.lineTo(nodes.last().x, nodes.last().y)
+        for (i in 0..cols) {
+            val x = i * colWidth
+            val wave1 = sin(timeSec * 2.0f + i * 0.6f) * 20f
+            val wave2 = cos(timeSec * 1.4f + i * 1.1f) * 15f
+            val y1 = seabedY + wave1
+            val y2 = seabedY + wave2 + 30f
 
-        paint.strokeWidth = baseWidth
+            if (i == 0) {
+                path.moveTo(x, y1)
+            } else {
+                val prevX = (i - 1) * colWidth
+                path.quadTo((prevX + x) / 2f, y2, x, y1)
+            }
+        }
         canvas.drawPath(path, paint)
+    }
+}
+
+class ProceduralAudioEngine {
+    private var audioTrack: AudioTrack? = null
+    @Volatile private var isPlaying = false
+    private var synthThread: Thread? = null
+
+    fun start() {
+        if (isPlaying) return
+        try {
+            val sampleRate = 22050
+            val minBufSize = AudioTrack.getMinBufferSize(
+                sampleRate,
+                AudioFormat.CHANNEL_OUT_MONO,
+                AudioFormat.ENCODING_PCM_16BIT
+            )
+
+            audioTrack = AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_GAME)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(sampleRate)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build()
+                )
+                .setBufferSizeInBytes(minBufSize.coerceAtLeast(4096))
+                .build()
+
+            audioTrack?.play()
+            isPlaying = true
+
+            synthThread = Thread {
+                val buffer = ShortArray(1024)
+                var phase = 0.0
+                val sampleRateF = sampleRate.toDouble()
+
+                while (isPlaying) {
+                    for (i in buffer.indices) {
+                        phase += 2.0 * Math.PI * 40.0 / sampleRateF
+                        if (phase > 2.0 * Math.PI) phase -= 2.0 * Math.PI
+                        val sineSample = sin(phase) * 450.0
+                        val noiseSample = (Random.nextDouble() - 0.5) * 300.0
+                        buffer[i] = (sineSample + noiseSample).toInt().coerceIn(-32768, 32767).toShort()
+                    }
+                    audioTrack?.write(buffer, 0, buffer.size)
+                }
+            }.apply { start() }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun stop() {
+        isPlaying = false
+        try {
+            synthThread?.join(250)
+            audioTrack?.stop()
+            audioTrack?.release()
+            audioTrack = null
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }
