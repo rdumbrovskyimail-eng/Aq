@@ -7,9 +7,10 @@
     <application
         android:name=".NeonApplication"
         android:allowBackup="true"
+        android:icon="@android:drawable/sym_def_app_icon"
         android:label="Neon Aquarium Ultra"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
+        android:theme="@style/Theme.AppCompat.NoActionBar.Fullscreen">
 
         <activity
             android:name=".MainActivity"
