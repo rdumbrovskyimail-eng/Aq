@@ -15,6 +15,7 @@ data class Vector2D(var x: Float = 0f, var y: Float = 0f) {
     fun normalize(): Vector2D { val m = mag(); if (m > 0.0001f) div(m); return this }
     fun limit(max: Float): Vector2D { if (magSq() > max * max) { normalize(); mult(max) }; return this }
     fun dist(v: Vector2D): Float = sqrt((x - v.x).pow(2) + (y - v.y).pow(2))
+    fun distSq(v: Vector2D): Float = (x - v.x).pow(2) + (y - v.y).pow(2)
     fun heading(): Float = atan2(y, x)
     fun copy(): Vector2D = Vector2D(x, y)
 
