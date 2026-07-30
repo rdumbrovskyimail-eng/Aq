@@ -158,7 +158,7 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             if (tapShockwave > 550f) { tapPoint = null; tapShockwave = 0f }
         }
 
-        for (plant in plants) plant.update(timeSec, currentAccX, currentAccY, tapPoint)
+        for (plant in plants) plant.update(timeSec, currentAccX, currentAccY, tapPoint, fishes)
         for (plankton in planktons) plankton.update(screenW, screenH, currentAccX, currentAccY)
 
         foods.removeAll { it.isEaten }
@@ -190,7 +190,9 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         fillPaint.color = Color.argb(90, 0, 240, 255)
         for (b in bubbles) canvas.drawCircle(b.x, b.y, 3.5f, fillPaint)
 
-        for (fish in fishes) fish.draw(canvas, lightingMode == LightingMode.NIGHT)
+        // Отрисовка с z-сортировкой рыб по глубине
+        val sortedFishes = fishes.sortedBy { it.depth }
+        for (fish in sortedFishes) fish.draw(canvas, lightingMode == LightingMode.NIGHT, screenH)
 
         tapPoint?.let { pt ->
             strokePaint.color = Color.parseColor("#00F0FF")
@@ -208,7 +210,7 @@ class AquariumView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
         canvas.drawText("🐠 Рыб: ${fishes.size}", 40f, 60f, uiPaint)
 
-        // Interactive HUD Buttons
+        // Кнопки интерфейса
         drawButton(canvas, "🍞 Корм", 40f, screenH - 80f, 160f, 60f, Color.parseColor("#FF9800"))
         drawButton(canvas, "🌗 Свет", 220f, screenH - 80f, 160f, 60f, Color.parseColor("#0288D1"))
         drawButton(canvas, "🧼 Очистка", 400f, screenH - 80f, 180f, 60f, Color.parseColor("#00C853"))
