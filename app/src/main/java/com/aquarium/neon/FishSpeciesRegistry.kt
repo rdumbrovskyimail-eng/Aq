@@ -5,6 +5,9 @@ import android.graphics.Color
 enum class BehaviorType { FLOCKING, SOLITARY, BOTTOM_DWELLER, HIDER, AGGRESSIVE, PREDATOR }
 enum class VisualForm { SLENDER_NEON, TALL_DISC, EEL_SNAKE, JELLY_GLOW, STAR_CRAWLER, SEAHORSE, MANTA_RAY, LIONFISH_SPIKY, PIRANHA_BITE, SHRIMP_MANTIS }
 
+// Определение структуры пещер/укрытий
+data class CoralCave(val pos: Vector2D, val radius: Float, val neonColor: Int)
+
 data class SpeciesConfig(
     val id: Int,
     val name: String,
