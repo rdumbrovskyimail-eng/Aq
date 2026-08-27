@@ -1,15 +1,14 @@
 package com.aquarium.neon
 
-import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
-import android.view.View
-import android.view.WindowInsets
-import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import kotlin.math.roundToInt
 
 class MainActivity : AppCompatActivity() {
@@ -25,12 +24,9 @@ class MainActivity : AppCompatActivity() {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             Log.e(TAG, "Необработанное исключение в ${thread.name}", throwable)
-            // Цепочку обработчиков рвать нельзя, иначе система не получит отчёт
-            // о падении и процесс зависнет вместо корректного завершения
             previous?.uncaughtException(thread, throwable)
         }
 
-        setupImmersive()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         root = FrameLayout(this)
@@ -53,7 +49,9 @@ class MainActivity : AppCompatActivity() {
             marginEnd = margin
         })
 
+        // setContentView должен вызываться до настройки WindowInsets / Immersive mode
         setContentView(root)
+        setupImmersive()
     }
 
     private fun openPanel() {
@@ -81,29 +79,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupImmersive() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.setDecorFitsSystemWindows(false)
-            window.insetsController?.let { c ->
-                c.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
-                c.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-            )
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            setupImmersive()
         }
     }
 
     override fun onResume() {
         super.onResume()
         glView.onResume()
-        audio.start()          // поток микшера живёт только пока экран активен
+        audio.start()
     }
 
     override fun onPause() {
