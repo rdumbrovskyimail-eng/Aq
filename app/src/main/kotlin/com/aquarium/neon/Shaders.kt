@@ -35,6 +35,9 @@ object Shaders {
     // ═══════════════════════════ РЫБЫ ═══════════════════════════
     val FISH_VS = """
         #version 300 es
+        precision highp float;
+        precision highp int;
+
         layout(location = 0) in vec3 aPosition;
         layout(location = 1) in vec3 aNormal;
         layout(location = 2) in vec2 aTexCoord;
@@ -48,8 +51,8 @@ object Shaders {
         uniform float uWaveAmp;
         uniform float uBodyLen;
         uniform float uHeadZ;
-        uniform float uFinTension;   // 0 спокойна .. 1 плавники растопырены от страха
-        uniform int   uForm;         // 0 fusiform 1 disc 2 eel 3 manta 4 jelly 5 shark 6 lionfish
+        uniform float uFinTension;
+        uniform int   uForm;
 
         out vec3  vWorldPos;
         out vec3  vNormal;
@@ -65,43 +68,45 @@ object Shaders {
             float u = clamp((uHeadZ - pos.z) / max(uBodyLen, 0.001), 0.0, 1.0);
             vBodyU = u;
 
-            // Испуганная рыба распускает плавники: точки дальше от оси расходятся сильнее
             float spread = uFinTension * 0.16;
             pos.x *= 1.0 + spread * step(0.30, abs(pos.x));
             pos.y *= 1.0 + spread * step(0.30, abs(pos.y));
 
             if (uForm == 3) {
-                // Скат: бегущая от корпуса к кончику крыла волна
+                // Скат
                 float ax = abs(pos.x);
                 float phase = uTime * uSwimSpeed - ax * 2.1;
                 float flap = sin(phase) * ax * ax * uWaveAmp * 2.2;
                 pos.y += flap;
                 float slope = cos(phase) * 2.0 * ax * uWaveAmp * 2.2 * sign(pos.x);
-                nrm = normalize(nrm - vec3(slope, 0.0, 0.0));
+                vec3 nn = nrm - vec3(slope, 0.0, 0.0);
+                nrm = length(nn) > 0.001 ? normalize(nn) : aNormal;
             } else if (uForm == 4) {
-                // Медуза: реактивный выброс воды из-под купола
+                // Медуза
                 float pulse = sin(uTime * uSwimSpeed);
-                float sharp = pow(pulse * 0.5 + 0.5, 2.6) - 0.34;
+                float sharp = pow(max(0.0, pulse * 0.5 + 0.5), 2.6) - 0.34;
                 float bell = smoothstep(-0.5, 0.9, pos.z);
                 pos.xy *= (1.0 - sharp * 0.24 * bell);
                 pos.z  -= sharp * 0.30 * bell;
-                float tent = smoothstep(0.1, -2.4, pos.z);
+                float tent = 1.0 - smoothstep(-2.4, 0.1, pos.z);
                 pos.x += sin(uTime * 1.7 + pos.z * 2.2) * tent * 0.32;
                 pos.y += cos(uTime * 1.3 + pos.z * 1.8) * tent * 0.24;
             } else if (uForm == 2) {
-                // Угорь: ундуляция по всей длине, амплитуда растёт к хвосту линейно
+                // Угорь
                 float amp = uWaveAmp * (0.25 + 0.75 * u);
                 float phase = uTime * uSwimSpeed - u * uWaveFreq;
                 pos.x += sin(phase) * amp;
                 float slope = cos(phase) * amp * uWaveFreq / max(uBodyLen, 0.001);
-                nrm = normalize(nrm + vec3(0.0, 0.0, -slope * 0.6));
+                vec3 nn = nrm + vec3(0.0, 0.0, -slope * 0.6);
+                nrm = length(nn) > 0.001 ? normalize(nn) : aNormal;
             } else {
-                // Карангиформное плавание: голова почти неподвижна, работает задняя треть
-                float amp = uWaveAmp * pow(u, 2.1);
+                // Карангиформное плавание
+                float amp = uWaveAmp * pow(max(0.0, u), 2.1);
                 float phase = uTime * uSwimSpeed - u * uWaveFreq;
                 pos.x += sin(phase) * amp;
                 float slope = cos(phase) * amp * uWaveFreq / max(uBodyLen, 0.001);
-                nrm = normalize(nrm + vec3(0.0, 0.0, -slope * 0.55));
+                vec3 nn = nrm + vec3(0.0, 0.0, -slope * 0.55);
+                nrm = length(nn) > 0.001 ? normalize(nn) : aNormal;
             }
 
             vLocal = pos;
@@ -117,6 +122,7 @@ object Shaders {
     val FISH_FS = """
         #version 300 es
         precision highp float;
+        precision highp int;
 
         in vec3  vWorldPos;
         in vec3  vNormal;
@@ -137,8 +143,8 @@ object Shaders {
         uniform float uStripeSharp;
         uniform float uOpacity;
         uniform float uMetallic;
-        uniform vec4  uEye;          // xyz локальная позиция глаза, w радиус (0 = глаза нет)
-        uniform int   uPattern;      // 0 полосы 1 пятна 2 сетка 3 однотонная 4 градиент
+        uniform vec4  uEye;
+        uniform int   uPattern;
         uniform int   uForm;
         $COMMON_FS
 
@@ -149,18 +155,18 @@ object Shaders {
         void main() {
             vec3 N = normalize(vNormal);
             vec3 V = normalize(uCameraPos - vWorldPos);
-            if (dot(N, V) < 0.0) N = -N;         // тонкие плавники освещаются с двух сторон
+            if (dot(N, V) < 0.0) N = -N;
 
             vec3 L = normalize(uLightDir);
             vec3 H = normalize(L + V);
 
             float diff = max(dot(N, L), 0.0);
-            float spec = pow(max(dot(N, H), 0.0), mix(36.0, 110.0, uMetallic));
+            float spec = pow(max(dot(N, H), 0.0), mix(36.0, 110.0, clamp(uMetallic, 0.0, 1.0)));
             float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-            float back = pow(max(dot(-N, L), 0.0), 2.1) * 0.42;   // просвет тела насквозь
+            float back = pow(max(dot(-N, L), 0.0), 2.1) * 0.42;
 
             // ── Рисунок окраски ─────────────────────────────────────────────
-            float pat;
+            float pat = 0.0;
             if (uPattern == 0) {
                 pat = sin(vBodyU * uStripeFreq * 6.28318) * 0.5 + 0.5;
                 pat = smoothstep(0.5 - uStripeSharp, 0.5 + uStripeSharp, pat);
@@ -174,26 +180,22 @@ object Shaders {
                 pat = smoothstep(-0.1, 0.35, a);
             } else if (uPattern == 4) {
                 pat = smoothstep(0.15, 0.85, vBodyU);
-            } else {
-                pat = 0.0;
             }
 
             float scales = sin(vTexCoord.x * 78.0) * sin(vBodyU * 150.0) * 0.5 + 0.5;
-            vec3 albedo = mix(uPrimary, uAccent, pat);
+            vec3 albedo = mix(uPrimary, uAccent, clamp(pat, 0.0, 1.0));
             albedo *= 0.88 + scales * 0.22;
 
-            // Противотеневая окраска: спина темнее, брюхо светлее
             float belly = smoothstep(-0.4, 0.5, -N.y);
             albedo = mix(albedo * 0.60, albedo + vec3(0.18), belly * 0.6);
 
-            // Жаберные щели у акулы
             if (uForm == 5) {
                 float gz = (vLocal.z - 0.55) * 7.0;
-                float gill = smoothstep(0.75, 1.0, sin(gz)) * step(abs(vLocal.y), 0.35) * step(0.3, abs(vLocal.x));
+                float gill = smoothstep(0.75, 1.0, sin(gz)) * (1.0 - step(0.35, abs(vLocal.y))) * step(0.3, abs(vLocal.x));
                 albedo *= 1.0 - gill * 0.55;
             }
 
-            // ── Глаз: считаем в локальном пространстве, зеркаля по X ────────
+            // ── Глаз ────────────────────────────────────────────────────────
             float eyeMask = 0.0, pupil = 0.0, glint = 0.0;
             if (uEye.w > 0.001) {
                 vec3 lp = vec3(abs(vLocal.x), vLocal.y, vLocal.z);
@@ -215,7 +217,6 @@ object Shaders {
                        + uGlow * irid * 0.32
                        + uLightColor * caustic * 0.55;
 
-            // Глаз рисуется поверх окраски
             color = mix(color, vec3(0.90, 0.92, 0.95) * (0.35 + diff), eyeMask);
             color = mix(color, vec3(0.02, 0.02, 0.03), pupil);
             color += vec3(1.0) * glint * 0.9;
@@ -231,6 +232,8 @@ object Shaders {
     // ═══════════════════════════ ДНО ═══════════════════════════
     val WORLD_VS = """
         #version 300 es
+        precision highp float;
+        precision highp int;
         layout(location = 0) in vec3 aPosition;
         layout(location = 1) in vec3 aNormal;
         layout(location = 2) in vec2 aTexCoord;
@@ -254,6 +257,7 @@ object Shaders {
     val FLOOR_FS = """
         #version 300 es
         precision highp float;
+        precision highp int;
         in vec3  vWorldPos;
         in vec3  vNormal;
         in vec2  vTexCoord;
@@ -276,7 +280,6 @@ object Shaders {
             vec3 N = normalize(vNormal);
             vec3 L = normalize(uLightDir);
 
-            // Песок трёх масштабов: дюны, зерно, микрокрупинки
             float grain = vnoise(vWorldPos.xz * 8.0) * 0.48
                         + vnoise(vWorldPos.xz * 30.0) * 0.34
                         + vnoise(vWorldPos.xz * 110.0) * 0.18;
@@ -290,7 +293,6 @@ object Shaders {
 
             color += uLightColor * causticField(vWorldPos, uTime) * 1.7;
 
-            // Отдельные искрящиеся песчинки
             float sparkle = step(0.9875, vnoise(vWorldPos.xz * 175.0 + floor(uTime * 2.5)));
             color += uLightColor * sparkle * 0.30;
 
@@ -302,6 +304,7 @@ object Shaders {
     val ROCK_FS = """
         #version 300 es
         precision highp float;
+        precision highp int;
         in vec3  vWorldPos;
         in vec3  vNormal;
         in vec2  vTexCoord;
@@ -333,7 +336,6 @@ object Shaders {
             float rough = noise3(vWorldPos * 2.4) * 0.6 + noise3(vWorldPos * 9.5) * 0.4;
             vec3 base = uBaseColor * (0.5 + rough * 0.8);
 
-            // Обрастание оседает на верхних гранях и слабо пульсирует
             float up = smoothstep(0.15, 0.85, N.y);
             float mossMask = smoothstep(0.42, 0.72, noise3(vWorldPos * 1.6)) * up;
             float pulse = sin(uTime * 1.3 + vWorldPos.x * 0.7 + vWorldPos.z * 0.5) * 0.5 + 0.5;
@@ -355,6 +357,9 @@ object Shaders {
     // ═══════════════════════════ РАСТЕНИЯ ═══════════════════════════
     val PLANT_VS = """
         #version 300 es
+        precision highp float;
+        precision highp int;
+
         layout(location = 0) in vec3 aPosition;
         layout(location = 1) in vec3 aNormal;
         layout(location = 2) in vec2 aTexCoord;
@@ -365,7 +370,7 @@ object Shaders {
         uniform float uTime;
         uniform float uPhase;
         uniform float uStiffness;
-        uniform float uCurrent;      // сила донного течения из настроек
+        uniform float uCurrent;
 
         out vec3  vWorldPos;
         out vec3  vNormal;
@@ -375,7 +380,6 @@ object Shaders {
 
         void main() {
             vec3 pos = aPosition;
-            // Плечо изгиба растёт нелинейно: основание жёсткое, верхушка гуляет
             float h = clamp(pos.y, 0.0, 10.0);
             float lever = pow(h, 1.6) * (1.0 - uStiffness * 0.65) * uCurrent;
             float t = uTime * 0.95 + uPhase;
@@ -395,6 +399,7 @@ object Shaders {
     val PLANT_FS = """
         #version 300 es
         precision highp float;
+        precision highp int;
         in vec3  vWorldPos;
         in vec3  vNormal;
         in vec2  vTexCoord;
@@ -415,7 +420,6 @@ object Shaders {
             vec3 L = normalize(uLightDir);
 
             float diff = max(dot(N, L), 0.0);
-            // Просвечивание листа насквозь — главный признак живого растения в воде
             float trans = pow(max(dot(-N, L), 0.0), 1.8) * 0.9;
 
             float vein = 1.0 - smoothstep(0.03, 0.15, abs(vTexCoord.x - 0.5));
@@ -439,6 +443,7 @@ object Shaders {
     val FOOD_FS = """
         #version 300 es
         precision highp float;
+        precision highp int;
         in vec3  vWorldPos;
         in vec3  vNormal;
         in vec2  vTexCoord;
@@ -462,12 +467,11 @@ object Shaders {
             float gloss = 0.15;
 
             if (uIsMeat == 1) {
-                // Мраморность: волокна мышц и прослойки жира
                 float fiber = sin(vTexCoord.x * 40.0 + sin(vTexCoord.y * 22.0) * 2.0) * 0.5 + 0.5;
                 float fat = smoothstep(0.72, 0.95, sin(vTexCoord.y * 15.0 + vTexCoord.x * 9.0) * 0.5 + 0.5);
                 col = mix(uBaseColor, vec3(0.42, 0.05, 0.06), fiber * 0.55);
                 col = mix(col, vec3(0.92, 0.88, 0.80), fat * 0.5);
-                gloss = 0.75;              // сырое мясо влажно бликует
+                gloss = 0.75;
             } else {
                 float flake = sin(vTexCoord.x * 60.0) * sin(vTexCoord.y * 60.0) * 0.5 + 0.5;
                 col *= 0.75 + flake * 0.5;
@@ -484,6 +488,8 @@ object Shaders {
     // ═══════════════════════════ ПУЗЫРИ ═══════════════════════════
     val BUBBLE_VS = """
         #version 300 es
+        precision highp float;
+        precision highp int;
         layout(location = 0) in vec3 aPosition;
         layout(location = 1) in vec3 aNormal;
         layout(location = 2) in vec2 aTexCoord;
@@ -496,7 +502,6 @@ object Shaders {
         out vec3  vNormal;
         out float vViewDist;
         void main() {
-            // Поверхностное натяжение непрерывно колеблет оболочку пузыря
             vec3 pos = aPosition;
             float d = sin(uTime * 6.5 + uWobble + aPosition.y * 7.5) * 0.06;
             pos *= (1.0 + d);
@@ -512,6 +517,7 @@ object Shaders {
     val BUBBLE_FS = """
         #version 300 es
         precision highp float;
+        precision highp int;
         in vec3  vWorldPos;
         in vec3  vNormal;
         in float vViewDist;
@@ -531,7 +537,6 @@ object Shaders {
             float fres = pow(1.0 - ndv, 2.7);
             float spec = pow(max(dot(N, H), 0.0), 140.0);
 
-            // Интерференция в тонкой плёнке: толщина плавает по высоте и во времени
             float thick = 3.3 + sin(vWorldPos.y * 5.5 + uTime * 1.7) * 1.5;
             vec3 irid = 0.5 + 0.5 * cos(6.28318 * thick * (1.0 - ndv) + vec3(0.0, 2.09, 4.19));
 
@@ -547,6 +552,8 @@ object Shaders {
     // ═══════════════════════ ПОВЕРХНОСТЬ ВОДЫ ═══════════════════════
     val SURFACE_VS = """
         #version 300 es
+        precision highp float;
+        precision highp int;
         layout(location = 0) in vec3 aPosition;
         layout(location = 1) in vec3 aNormal;
         layout(location = 2) in vec2 aTexCoord;
@@ -565,7 +572,6 @@ object Shaders {
             float w3 = sin((pos.x + pos.z) * 0.33 + uTime * 1.60) * 0.12;
             pos.y += w1 + w2 + w3;
 
-            // Аналитическая нормаль поверхности — без неё нет блика на гребнях волн
             float dx = cos(pos.x * 0.55 + uTime * 1.10) * 0.143
                      + cos((pos.x + pos.z) * 0.33 + uTime * 1.60) * 0.040;
             float dz = cos(pos.z * 0.72 - uTime * 0.83) * 0.144
@@ -583,6 +589,7 @@ object Shaders {
     val SURFACE_FS = """
         #version 300 es
         precision highp float;
+        precision highp int;
         in vec3  vWorldPos;
         in vec3  vNormal;
         in float vViewDist;
@@ -600,7 +607,6 @@ object Shaders {
             vec3 H = normalize(L + V);
 
             float ndv = max(dot(N, V), 0.0);
-            // Смотрим на поверхность снизу: за критическим углом ~48.6° она зеркалит
             float tir = smoothstep(0.66, 0.32, ndv);
             float spec = pow(max(dot(N, H), 0.0), 200.0);
 
@@ -617,6 +623,8 @@ object Shaders {
     // ═══════════════════════ ФОН И ЛУЧИ ═══════════════════════
     val BG_VS = """
         #version 300 es
+        precision highp float;
+        precision highp int;
         layout(location = 0) in vec3 aPosition;
         layout(location = 1) in vec3 aNormal;
         layout(location = 2) in vec2 aTexCoord;
@@ -627,6 +635,7 @@ object Shaders {
     val BG_FS = """
         #version 300 es
         precision highp float;
+        precision highp int;
         in vec2 vUv;
         uniform float uTime;
         uniform vec3  uDeepColor;
@@ -636,7 +645,6 @@ object Shaders {
             float depth = pow(clamp(vUv.y, 0.0, 1.0), 1.35);
             vec3 col = mix(uDeepColor, uShallowColor, depth);
 
-            // Планктонная взвесь в толще воды
             vec2 p = vUv * vec2(64.0, 36.0);
             float m = fract(sin(dot(floor(p), vec2(41.3, 289.1))) * 43758.5453);
             float motes = smoothstep(0.9955, 1.0, m) * (0.5 + 0.5 * sin(uTime * 1.8 + m * 30.0));
@@ -651,6 +659,7 @@ object Shaders {
     val GODRAY_FS = """
         #version 300 es
         precision highp float;
+        precision highp int;
         in vec2 vUv;
         uniform float uTime;
         uniform vec3  uRayColor;
@@ -665,7 +674,6 @@ object Shaders {
                        + pow(max(sin(ang * 27.0 - uTime * 0.19 + 1.7), 0.0), 13.0) * 0.72
                        + pow(max(sin(ang * 41.0 + uTime * 0.13 + 3.1), 0.0), 17.0) * 0.48;
 
-            // Затухание Бугера — Ламберта по глубине
             float atten = exp(-dist * 1.55) * smoothstep(0.0, 0.45, vUv.y);
             float shimmer = 0.78 + 0.22 * sin(uTime * 1.5 + ang * 7.0);
             fragColor = vec4(uRayColor * rays * atten * shimmer * uIntensity, 1.0);
@@ -675,6 +683,8 @@ object Shaders {
     // ═══════════════════════ ЧАСТИЦЫ ═══════════════════════
     val PARTICLE_VS = """
         #version 300 es
+        precision highp float;
+        precision highp int;
         layout(location = 0) in vec3 aPosition;
         layout(location = 1) in vec4 aColor;
         layout(location = 2) in vec2 aSizeLife;
@@ -694,14 +704,15 @@ object Shaders {
     val PARTICLE_FS = """
         #version 300 es
         precision mediump float;
+        precision highp int;
         in vec4  vColor;
         in float vLife;
-        uniform int uSoftCore;    // 1 = светящееся ядро (кавитация), 0 = плотное облако (кровь, снег)
+        uniform int uSoftCore;
         out vec4 fragColor;
         void main() {
             vec2 d = gl_PointCoord - vec2(0.5);
             float r2 = dot(d, d);
-            if (r2 > 0.25) discard;                       // круглая точка вместо квадрата
+            if (r2 > 0.25) discard;
             float falloff = 1.0 - smoothstep(0.0, 0.25, r2);
             if (uSoftCore == 1) {
                 float core = pow(falloff, 3.0);
