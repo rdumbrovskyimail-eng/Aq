@@ -2,7 +2,6 @@ package com.aquarium.neon
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue
 import android.view.Gravity
@@ -77,10 +76,10 @@ class SettingsPanel(context: Context, private val onClose: () -> Unit) : FrameLa
         hint("Одиночный тап по экрану выполняет выбранное действие")
 
         section("Живность")
-        slider("Плотность популяции", Settings.fishDensity, 0.25f, 2.0f, { v ->
+        slider("Плотность популяции", Settings.fishDensity, 0.25f, 2.0f, onRelease = { Settings.requestRebuild() }) { v ->
             Settings.fishDensity = v
             "${(v * 100).roundToInt()} %"
-        }, onRelease = { Settings.requestRebuild() })
+        }
 
         toggle("Хищники охотятся", Settings.predatorsEnabled) { on ->
             Settings.predatorsEnabled = on
@@ -177,7 +176,8 @@ class SettingsPanel(context: Context, private val onClose: () -> Unit) : FrameLa
      */
     private fun slider(
         label: String, initial: Float, min: Float, max: Float,
-        format: (Float) -> String, onRelease: (() -> Unit)? = null
+        onRelease: (() -> Unit)? = null,
+        format: (Float) -> String
     ) {
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
