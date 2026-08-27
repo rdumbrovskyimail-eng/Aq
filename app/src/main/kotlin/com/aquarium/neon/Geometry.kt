@@ -14,7 +14,11 @@ class MeshBuilder(estimateVerts: Int = 512) {
     val vertexCount: Int get() = px.size / 3
 
     fun v(x: Float, y: Float, z: Float, u: Float, w: Float): Int {
-        px.add(x); px.add(y); px.add(z); uv.add(u); uv.add(w)
+        px.add(if (x.isFinite()) x else 0f)
+        px.add(if (y.isFinite()) y else 0f)
+        px.add(if (z.isFinite()) z else 0f)
+        uv.add(if (u.isFinite()) u else 0f)
+        uv.add(if (w.isFinite()) w else 0f)
         return px.size / 3 - 1
     }
 
@@ -34,9 +38,11 @@ class MeshBuilder(estimateVerts: Int = 512) {
             val nx = uy * vz - uz * vy
             val ny = uz * vx - ux * vz
             val nz = ux * vy - uy * vx
-            nrm[a] += nx; nrm[a + 1] += ny; nrm[a + 2] += nz
-            nrm[b] += nx; nrm[b + 1] += ny; nrm[b + 2] += nz
-            nrm[c] += nx; nrm[c + 1] += ny; nrm[c + 2] += nz
+            if (nx.isFinite() && ny.isFinite() && nz.isFinite()) {
+                nrm[a] += nx; nrm[a + 1] += ny; nrm[a + 2] += nz
+                nrm[b] += nx; nrm[b + 1] += ny; nrm[b + 2] += nz
+                nrm[c] += nx; nrm[c + 1] += ny; nrm[c + 2] += nz
+            }
             i += 3
         }
 
@@ -46,7 +52,7 @@ class MeshBuilder(estimateVerts: Int = 512) {
             out[o] = px[k * 3]; out[o + 1] = px[k * 3 + 1]; out[o + 2] = px[k * 3 + 2]
             var nx = nrm[k * 3]; var ny = nrm[k * 3 + 1]; var nz = nrm[k * 3 + 2]
             val len = sqrt(nx * nx + ny * ny + nz * nz)
-            if (len > 1e-6f) { nx /= len; ny /= len; nz /= len } else { nx = 0f; ny = 1f; nz = 0f }
+            if (len > 1e-6f && len.isFinite()) { nx /= len; ny /= len; nz /= len } else { nx = 0f; ny = 1f; nz = 0f }
             out[o + 3] = nx; out[o + 4] = ny; out[o + 5] = nz
             out[o + 6] = uv[k * 2]; out[o + 7] = uv[k * 2 + 1]
         }
@@ -130,7 +136,7 @@ object Geometry {
         for (k in 0..segs) {
             val t = k.toFloat() / segs
             val z = z0 + (z1 - z0) * t
-            val w = w0 * (1f - t).pow(taper)
+            val w = w0 * max(0f, 1f - t).pow(taper)
             val s = 1f - t * shrink
             e0[k] = b.v(ox * s - dirX * w, oy * s - dirY * w, z, 0f, 1f - t)
             e1[k] = b.v(ox * s + dirX * w, oy * s + dirY * w, z, 1f, 1f - t)
@@ -143,7 +149,7 @@ object Geometry {
     /** Обтекаемое веретеновидное тело: тетры, хирурги, клоуны, кардиналы. */
     private fun fusiform(): MeshData {
         val b = MeshBuilder(800)
-        val prof = { u: Float -> sin(u.pow(0.82f) * PI.toFloat()).pow(0.85f) }
+        val prof = { u: Float -> max(0f, sin(max(0f, u).pow(0.82f) * PI.toFloat())).pow(0.85f) }
         revolve(b, 22, 16, 1.10f, -1.50f, { prof(it) * 0.33f }, { prof(it) * 0.50f })
 
         // Раздвоенный (гомоцеркальный) хвост
@@ -173,7 +179,7 @@ object Geometry {
     /** Высокое дисковидное тело: ангелы, бабочки, мавританский идол. */
     private fun discFish(): MeshData {
         val b = MeshBuilder(800)
-        val prof = { u: Float -> sin(u.pow(0.9f) * PI.toFloat()).pow(0.7f) }
+        val prof = { u: Float -> max(0f, sin(max(0f, u).pow(0.9f) * PI.toFloat())).pow(0.7f) }
         revolve(b, 20, 16, 1.00f, -1.20f, { prof(it) * 0.20f }, { prof(it) * 1.08f })
 
         finYZ(b, 0f, arrayOf(   // парусный спинной с вытянутой нитью
@@ -203,10 +209,10 @@ object Geometry {
     private fun eel(): MeshData {
         val b = MeshBuilder(1000)
         val zH = 1.30f; val zT = -3.50f
-        val prof = { u: Float -> (1f - exp(-u * 9f)) * (1f - u).pow(0.55f) }
+        val prof = { u: Float -> (1f - exp(-u * 9f)) * max(0f, 1f - u).pow(0.55f) }
         revolve(b, 30, 12, zH, zT, { prof(it) * 0.155f }, { prof(it) * 0.235f })
 
-        // Спинная лента идёт от затылка до кончика хвоста — без неё мурена похожа на червя
+        // Спинная лента идёт от затылка до кончика хвоста
         val n = 20
         val top = IntArray(n + 1); val edge = IntArray(n + 1)
         for (k in 0..n) {
@@ -242,13 +248,13 @@ object Geometry {
         for (i in 0..span) {
             val sx = i.toFloat() / span * 2f - 1f
             val ax = abs(sx)
-            val front = 0.92f - 1.28f * ax        // передняя кромка уходит назад
+            val front = 0.92f - 1.28f * ax
             val back = -0.78f - 0.42f * ax
             val x = sx * 1.85f
             for (j in 0..chord) {
                 val t = j.toFloat() / chord
                 val z = front + (back - front) * t
-                val camber = sin(t.pow(0.62f) * PI.toFloat())
+                val camber = max(0f, sin(max(0f, t).pow(0.62f) * PI.toFloat()))
                 val th = 0.135f * camber * (1f - ax * 0.82f).coerceAtLeast(0.06f)
                 top[i][j] = b.v(x, th, z, sx * 0.5f + 0.5f, t)
                 bot[i][j] = b.v(x, -th * 0.72f, z, sx * 0.5f + 0.5f, t)
@@ -258,10 +264,10 @@ object Geometry {
             b.quad(top[i][j], top[i + 1][j], top[i + 1][j + 1], top[i][j + 1])
             b.quad(bot[i][j], bot[i][j + 1], bot[i + 1][j + 1], bot[i + 1][j])
         }
-        // Замыкаем заднюю кромку — иначе крыло просвечивает изнутри
+        // Замыкаем заднюю кромку
         for (i in 0 until span) b.quad(top[i][chord], top[i + 1][chord], bot[i + 1][chord], bot[i][chord])
 
-        // Головные (цефальные) лопасти
+        // Головные лопасти
         finXZ(b, 0.05f, arrayOf(
             floatArrayOf(0.14f, 0.90f), floatArrayOf(0.30f, 1.42f),
             floatArrayOf(0.20f, 1.46f), floatArrayOf(0.06f, 0.92f)
@@ -280,7 +286,7 @@ object Geometry {
         val b = MeshBuilder(1000)
         val rings = 18; val seg = 20
         val prof = { u: Float ->
-            if (u < 0.72f) sin(u / 0.72f * (PI.toFloat() / 2f)).pow(0.78f)
+            if (u < 0.72f) max(0f, sin(u / 0.72f * (PI.toFloat() / 2f))).pow(0.78f)
             else { val k = (u - 0.72f) / 0.28f; (1f - k * 0.35f) * (1f + sin(k * PI.toFloat()) * 0.10f) }
         }
         val zAt = { u: Float ->
@@ -304,7 +310,7 @@ object Geometry {
             b.tri(r0, r1, r0 + 1); b.tri(r0 + 1, r1, r1 + 1)
         }
 
-        // Щупальца: без них шейдерная анимация «шлейфа» анимировала пустоту
+        // Щупальца
         for (t in 0 until 8) {
             val ang = t / 8f * 2f * PI.toFloat()
             ribbonZ(
@@ -313,7 +319,7 @@ object Geometry {
                 -sin(ang), cos(ang), 0.085f, 0.7f, 0.35f
             )
         }
-        // Четыре широкие оральные лопасти в центре
+        // Четыре широкие оральные лопасти
         for (t in 0 until 4) {
             val ang = t / 4f * 2f * PI.toFloat() + 0.4f
             ribbonZ(
@@ -329,8 +335,7 @@ object Geometry {
     private fun shark(): MeshData {
         val b = MeshBuilder(1100)
         val prof = { u: Float ->
-            // Пик толщины сдвинут к голове — характерный силуэт хищника
-            sin((u * 0.86f + 0.07f).pow(0.72f) * PI.toFloat()).pow(0.9f)
+            max(0f, sin(max(0f, u * 0.86f + 0.07f).pow(0.72f) * PI.toFloat())).pow(0.9f)
         }
         revolve(b, 26, 16, 1.80f, -2.00f, { prof(it) * 0.42f }, { prof(it) * 0.52f })
 
@@ -346,7 +351,7 @@ object Geometry {
             floatArrayOf(-0.26f, -1.40f), floatArrayOf(-0.62f, -1.70f),
             floatArrayOf(-0.54f, -1.90f), floatArrayOf(-0.20f, -1.78f)
         ))
-        finYZ(b, 0f, arrayOf(   // гетероцеркальный хвост: верхняя лопасть длиннее
+        finYZ(b, 0f, arrayOf(   // гетероцеркальный хвост
             floatArrayOf(0.00f, -1.95f), floatArrayOf(1.15f, -3.05f), floatArrayOf(0.78f, -3.28f),
             floatArrayOf(0.00f, -2.32f), floatArrayOf(-0.62f, -2.92f), floatArrayOf(-0.40f, -2.58f)
         ))
@@ -364,10 +369,10 @@ object Geometry {
     /** Крылатка: веер ядовитых лучей и огромные грудные плавники. */
     private fun lionfish(): MeshData {
         val b = MeshBuilder(1400)
-        val prof = { u: Float -> sin(u.pow(0.85f) * PI.toFloat()).pow(0.8f) }
+        val prof = { u: Float -> max(0f, sin(max(0f, u).pow(0.85f) * PI.toFloat())).pow(0.8f) }
         revolve(b, 20, 14, 1.00f, -1.30f, { prof(it) * 0.38f }, { prof(it) * 0.55f })
 
-        // Спинные ядовитые иглы — каждая отдельным лучом с перепонкой
+        // Спинные ядовитые иглы
         for (i in 0 until 9) {
             val z = 0.55f - i * 0.19f
             val len = 1.55f - abs(i - 3) * 0.10f
@@ -423,7 +428,6 @@ object Geometry {
 
     fun flake(): MeshData {
         val b = MeshBuilder(24)
-        // Тонкая изогнутая пластинка — хлопья корма именно так и выглядят
         val ids = Array(3) { IntArray(3) }
         for (i in 0..2) for (j in 0..2) {
             val x = (i - 1) * 0.28f
@@ -453,7 +457,7 @@ object Geometry {
     fun floorHeight(x: Float, z: Float, halfD: Float): Float {
         val h = Noise.fbm(x * 0.08f + 11f, z * 0.08f + 7f, 4) * 1.35f +
                 Noise.fbm(x * 0.42f, z * 0.42f, 2) * 0.28f
-        val slope = ((-z + halfD) / (halfD * 2f)).pow(1.6f) * 1.5f
+        val slope = max(0f, (-z + halfD) / (halfD * 2f)).pow(1.6f) * 1.5f
         return h + slope
     }
 
