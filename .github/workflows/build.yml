@@ -1,17 +1,18 @@
-name: Build Android APK
+name: Build Neon Aquarium 3D
 
 on:
   push:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -19,20 +20,27 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: gradle
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Если gradle-wrapper.jar не закоммичен, шаг создаёт wrapper сам —
+      # иначе сборка падает на "gradlew: No such file or directory"
+      - name: Bootstrap Gradle wrapper if missing
+        run: |
+          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "gradle-wrapper.jar отсутствует — генерирую wrapper"
+            gradle wrapper --gradle-version 8.9
+          fi
+          chmod +x ./gradlew
 
       - name: Build Release APK
-        run: |
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
-            ./gradlew assembleRelease --stacktrace
-          else
-            gradle assembleRelease --stacktrace
-          fi
+        run: ./gradlew assembleRelease --stacktrace --no-daemon
 
-      - name: Upload Release APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: NeonAquarium-Release-APK
+          name: NeonAquarium3D-v5-release
           path: app/build/outputs/apk/release/*.apk
-          retention-days: 7
+          if-no-files-found: error
+          retention-days: 14
